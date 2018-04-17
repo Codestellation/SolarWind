@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <AssemblyName>Codestellation.SolarWind.Tests</AssemblyName>
+    <RootNamespace>Codestellation.SolarWind.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>7035</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OutputPath Condition="$(OutputPath) == ''">..\..\build\bin</OutputPath>
+    <OutDir Condition="$(OutputPath) != ''">$(OutputPath)\$(MSBuildProjectName)\$(TargetFramework)\</OutDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+      <PackageReference Include="xunit" Version="2.3.1" />
+      <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SolarWind\SolarWind.csproj" />
+  </ItemGroup>
+
+</Project>

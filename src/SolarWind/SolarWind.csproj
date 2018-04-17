@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Authors>Jury Soldatenkov</Authors>
+    <Company>Codestellation</Company>
+    <Description>Pure .net standard alternative for zmq</Description>
+    <Copyright>Copyright (c) Codestellation 2018</Copyright>
+    <PackageId>Codestellation.SolarWind</PackageId>
+    <PackageProjectUrl>https://github.com/codestellation/solarwind</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/codestellation/solarwind</RepositoryUrl>
+    <AssemblyName>Codestellation.SolarWind</AssemblyName>
+    <RootNamespace>Codestellation.SolarWind</RootNamespace>
+    <NoWarn>7035</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OutputPath Condition="$(OutputPath) == ''">..\..\build\bin</OutputPath>
+    <OutDir>$(OutputPath)\$(MSBuildProjectName)\$(TargetFramework)\</OutDir>
+  </PropertyGroup>
+
+</Project>
