@@ -1,10 +1,10 @@
-using Xunit;
+using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
 {
     public class ScratchPad
     {
-        [Fact]
+        [Test]
         public void Test()
         {
         }
