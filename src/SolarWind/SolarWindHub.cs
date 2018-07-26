@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -28,7 +27,7 @@ namespace Codestellation.SolarWind
 
         public void Listen(Uri uri)
         {
-            IPEndPoint endpoint = ResolveLocalEndpoint(uri);
+            IPEndPoint endpoint = uri.ResolveLocalEndpoint();
             _listener.Bind(endpoint);
             _listener.Listen(10);
         }
@@ -53,25 +52,15 @@ namespace Codestellation.SolarWind
             }
         }
 
-        private IPEndPoint ResolveLocalEndpoint(Uri localUri)
+        public Channel Connect(Uri remoteUri)
         {
-            Uri uri = localUri.Host == "*"
-                ? new Uri(localUri.OriginalString.Replace("*", "0.0.0.0"))
-                : localUri;
-            if (!IPAddress.TryParse(uri.Host, out IPAddress ipAddress))
-            {
-                ipAddress = Dns
-                    .GetHostAddresses(uri.Host)
-                    .SingleOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-            }
-
-            if (ipAddress == null)
-            {
-                throw new ArgumentException($"Could not resolve address {uri}. Please notice IPv6 is not supported currently");
-            }
-
-            return new IPEndPoint(ipAddress, uri.Port);
+            Socket socket = Build.TcpIPv4();
+            socket.Connect(remoteUri.ResolveRemoteEndpoint());
+            Channel channel = Channel.Client(socket, _options);
+            _channels.Add(channel);
+            return channel;
         }
+
 
         public void Dispose() => _disposed = true;
     }

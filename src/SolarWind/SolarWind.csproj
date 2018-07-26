@@ -24,8 +24,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Pipelines.Sockets.Unofficial" Version="0.2.1-alpha.68" />
     <PackageReference Include="protobuf-net" Version="2.3.13" />
+    <PackageReference Include="system.io.pipelines" Version="4.5.0" />
   </ItemGroup>
 
 </Project>
