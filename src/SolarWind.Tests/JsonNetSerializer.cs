@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Text;
 using Newtonsoft.Json;
@@ -22,6 +21,12 @@ namespace Codestellation.SolarWind.Tests
             }
         }
 
-        public object Deserialize(MessageTypeId prefix, Stream stream) => throw new NotImplementedException();
+        public object Deserialize(MessageTypeId prefix, Stream stream)
+        {
+            using (var reader = new JsonTextReader(new StreamReader(stream)) {CloseInput = false})
+            {
+                return _serializer.Deserialize<TextMessage>(reader);
+            }
+        }
     }
 }

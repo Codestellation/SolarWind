@@ -20,9 +20,9 @@ namespace Codestellation.SolarWind
             _options = options.Clone();
             _channels = new List<Channel>();
 
+            _listener = Build.TcpIPv4();
             _listenerThread = new Thread(Listen);
             _listenerThread.Start();
-            _listener = Build.TcpIPv4();
         }
 
         public void Listen(Uri uri)

@@ -18,11 +18,6 @@ namespace Codestellation.SolarWind.Tests
         private ManualResetEvent _serverReceivedMessage;
         private ManualResetEvent _clientReceivedMessage;
 
-        public class TextMessage
-        {
-            public string Text { get; set; }
-        }
-
         [SetUp]
         public void Setup()
         {

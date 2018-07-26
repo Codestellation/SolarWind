@@ -106,9 +106,9 @@ namespace Codestellation.SolarWind
                 _options.Serializer.Serialize(message.Payload, _writeBuffer);
 
                 var header = new Header(message.MessageTypeId, PayloadSize.From(_writeBuffer, Header.Size));
-                Header.WriteTo(in header, _writeBuffer.GetBuffer());
-                _writeBuffer.CopyTo(_tcpStream);
-                _tcpStream.Flush();
+                byte[] buffer = _writeBuffer.GetBuffer();
+                Header.WriteTo(in header, buffer);
+                _tcpStream.Write(buffer, 0, (int)_writeBuffer.Position);
             }
         });
     }
