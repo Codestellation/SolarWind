@@ -5,9 +5,9 @@ namespace Codestellation.SolarWind
 {
     public readonly unsafe struct MessageTypeId
     {
-        public readonly long Id;
+        public readonly int Id;
 
-        public MessageTypeId(long id)
+        public MessageTypeId(int id)
         {
             Id = id;
         }

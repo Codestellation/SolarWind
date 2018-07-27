@@ -9,14 +9,17 @@ namespace Codestellation.SolarWind
         public static readonly unsafe int Size = sizeof(Header);
 
         public readonly ushort Version;
-        public readonly MessageTypeId MessageId;
+        public readonly MessageTypeId MessageTypeId;
         public readonly PayloadSize PayloadSize;
+        public readonly MessageId MessageId;
 
-        public Header(MessageTypeId messageId, PayloadSize payloadSize)
+
+        public Header(MessageTypeId messageTypeTypeId, PayloadSize payloadSize, MessageId messageId = default)
         {
             Version = 1;
-            MessageId = messageId;
+            MessageTypeId = messageTypeTypeId;
             PayloadSize = payloadSize;
+            MessageId = messageId;
         }
 
         public static unsafe void WriteTo(in Header header, byte[] buffer)

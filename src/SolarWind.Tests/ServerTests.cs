@@ -32,7 +32,9 @@ namespace Codestellation.SolarWind.Tests
             Console.WriteLine(BitConverter.ToString(buffer, 0, received));
         }
 
-        private void OnCallback(Channel channel, Message message) => throw new NotImplementedException();
+        private void OnCallback(Channel channel, Message message)
+        {
+        }
 
         private void OnAccept(Channel channel)
         {

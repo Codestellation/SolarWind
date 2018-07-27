@@ -1,26 +1,28 @@
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Threading;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Internals;
 
 namespace Codestellation.SolarWind
 {
-    public delegate void SolarWindCallback(Channel channel, Message message);
-
-    public class Channel
+    public class Channel : IDisposable
     {
         private readonly Socket _socket;
         private readonly Stream _tcpStream;
         private readonly SolarWindHubOptions _options;
-        private bool _disposed;
 
-        private Task _reader;
-        private Task _writer;
+        private readonly Task _reader;
+        private readonly Task _writer;
         private readonly BlockingCollection<Message> _outgoings;
         private readonly MemoryStream _writeBuffer;
         private readonly MemoryStream _readBuffer;
+        private readonly CancellationTokenSource _cancellationSource;
 
 
         public static Channel Server(Socket socket, SolarWindHubOptions options)
@@ -49,6 +51,8 @@ namespace Codestellation.SolarWind
             _socket = socket;
             _tcpStream = tcpStream;
             _options = options;
+
+            _cancellationSource = new CancellationTokenSource();
             _outgoings = new BlockingCollection<Message>();
 
             _writeBuffer = new MemoryStream(1024);
@@ -60,56 +64,106 @@ namespace Codestellation.SolarWind
 
         public void Post(Message message) => _outgoings.Add(message);
 
-        private async Task StartReadingTask()
+        private Task StartReadingTask() => Task.Run(() =>
         {
-            while (!_disposed)
+            while (!_cancellationSource.IsCancellationRequested)
             {
-                await Receive(Header.Size).ConfigureAwait(false);
-                Header header = Header.ReadFrom(_readBuffer.GetBuffer());
-
-                await Receive(header.PayloadSize.Value).ConfigureAwait(false);
-
-                object payload = _options.Serializer.Deserialize(header.MessageId, _tcpStream);
-                var message = new Message(header.MessageId, payload);
-                _options.Callback(this, message);
+                try
+                {
+                    Receive();
+                }
+                catch (ObjectDisposedException) when (_cancellationSource.IsCancellationRequested)
+                {
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                }
             }
+        });
+
+        private void Receive()
+        {
+            if (!Receive(Header.Size))
+            {
+                return;
+            }
+
+            Header header = Header.ReadFrom(_readBuffer.GetBuffer());
+
+            if (!Receive(header.PayloadSize.Value))
+            {
+                return;
+            }
+
+            object payload = _options.Serializer.Deserialize(header.MessageTypeId, _tcpStream);
+            var message = new Message(header.MessageTypeId, payload);
+            _options.Callback(this, message);
         }
 
-        private Task Receive(int bytesToReceive) => Task.Run(() =>
+        private bool Receive(int bytesToReceive)
         {
             if (_readBuffer.Capacity < bytesToReceive)
             {
                 _readBuffer.Capacity = bytesToReceive;
             }
 
+            var readList = new List<Socket>(1);
+            var errorList = new List<Socket>(1);
+
             while (_readBuffer.Position < bytesToReceive)
             {
+                readList.Add(_socket);
+                errorList.Add(_socket);
+
+                Socket.Select(readList, null, errorList, 100_000);
+
+                if (_cancellationSource.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                if (readList.Count == 0)
+                {
+                    continue;
+                }
+
                 byte[] buffer = _readBuffer.GetBuffer();
 
                 var position = (int)_readBuffer.Position;
                 var count = bytesToReceive - position;
-                _readBuffer.Position += _socket.Receive(buffer, position, count, SocketFlags.None);
-                //_readBuffer.Position += _tcpStream.Read(buffer, position, count);
+
+                _readBuffer.Position += _tcpStream.Read(buffer, position, count);
             }
 
             _readBuffer.Position = 0;
             _readBuffer.SetLength(bytesToReceive);
-        });
+            return true;
+        }
 
         private Task StartWritingTask() => Task.Run(() =>
         {
-            foreach (Message message in _outgoings.GetConsumingEnumerable())
+            try
             {
-                _writeBuffer.SetLength(Header.Size);
-                _writeBuffer.Position = Header.Size;
-
-                _options.Serializer.Serialize(message.Payload, _writeBuffer);
-
-                var header = new Header(message.MessageTypeId, PayloadSize.From(_writeBuffer, Header.Size));
-                byte[] buffer = _writeBuffer.GetBuffer();
-                Header.WriteTo(in header, buffer);
-                _tcpStream.Write(buffer, 0, (int)_writeBuffer.Position);
+                foreach (Message message in _outgoings.GetConsumingEnumerable(_cancellationSource.Token))
+                {
+                    _options.Serializer.SerializeMessage(_writeBuffer, in message);
+                    _tcpStream.Write(_writeBuffer.GetBuffer(), 0, (int)_writeBuffer.Position);
+                }
+            }
+            catch (OperationCanceledException)
+            {
             }
         });
+
+        public void Dispose()
+        {
+            _cancellationSource.Cancel();
+            _writer.Wait();
+            _tcpStream.Dispose();
+            _socket.Disconnect(false);
+            _socket.Dispose();
+            _reader.Wait();
+        }
     }
 }

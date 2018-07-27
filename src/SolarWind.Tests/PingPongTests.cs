@@ -46,6 +46,13 @@ namespace Codestellation.SolarWind.Tests
             _clientReceivedMessage = new ManualResetEvent(false);
         }
 
+        [TearDown]
+        public void TearDown()
+        {
+            _server?.Dispose();
+            _client?.Dispose();
+        }
+
         [Test]
         public void PingPong()
         {

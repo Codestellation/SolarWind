@@ -1,5 +1,3 @@
-using System.IO;
-using System.Net.Sockets;
 using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
@@ -9,7 +7,6 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void Test()
         {
-
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using Codestellation.SolarWind.Misc;
 
 namespace Codestellation.SolarWind
@@ -62,6 +63,12 @@ namespace Codestellation.SolarWind
         }
 
 
-        public void Dispose() => _disposed = true;
+        public void Dispose()
+        {
+            _disposed = true;
+
+            Parallel.ForEach(_channels, c => c.Dispose());
+            _listener.Dispose();
+        }
     }
 }
