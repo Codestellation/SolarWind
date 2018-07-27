@@ -63,7 +63,40 @@ namespace Codestellation.SolarWind.Tests
                     Thread.Sleep(100);
                 }
 
-    
+
+                AssertReceived(client);
+            }
+        }
+
+
+        [Test]
+        public void Should_handle_disconnect_gracefully()
+        {
+            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            {
+                client.Connect(_uri.Host, _uri.Port);
+
+                const int chunkSize = 7;
+                for (var i = 0; i < 12; i++)
+                {
+                    client.Client.Send(_messageBuffer.GetBuffer(), i * chunkSize, chunkSize, SocketFlags.None);
+                    Thread.Sleep(100);
+
+                    if (i == 5)
+                    {
+                        client.Dispose();
+                    }
+
+                    break;
+                }
+            }
+
+
+            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            {
+                client.Connect(_uri.Host, _uri.Port);
+                client.Client.Send(_messageBuffer.GetBuffer(), 0, (int)_messageBuffer.Position, SocketFlags.None);
+
                 AssertReceived(client);
             }
         }

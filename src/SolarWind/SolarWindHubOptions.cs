@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Codestellation.SolarWind
@@ -10,6 +11,16 @@ namespace Codestellation.SolarWind
         public ISerializer Serializer { get; set; }
         public SolarWindCallback Callback { get; set; }
         public X509Certificate Certificate { get; set; }
+
+        /// <summary>
+        /// Used to identify application level connections and preserve session between reconnections.
+        /// </summary>
+        public string HubId { get; set; }
+
+        public SolarWindHubOptions()
+        {
+            HubId = $"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}";
+        }
 
 
         public Action<Channel> OnAccept
