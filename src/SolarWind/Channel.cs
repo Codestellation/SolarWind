@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -68,18 +67,11 @@ namespace Codestellation.SolarWind
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
-                try
-                {
-                    Receive();
-                }
-                catch (ObjectDisposedException) when (_cancellationSource.IsCancellationRequested)
-                {
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
+                Receive();
             }
+
+            _socket.Close();
+            _socket.Dispose();
         });
 
         private void Receive()
@@ -108,22 +100,14 @@ namespace Codestellation.SolarWind
                 _readBuffer.Capacity = bytesToReceive;
             }
 
-            var readList = new List<Socket>(1);
-            var errorList = new List<Socket>(1);
-
-            while (_readBuffer.Position < bytesToReceive)
+            do
             {
-                readList.Add(_socket);
-                errorList.Add(_socket);
-
-                Socket.Select(readList, null, errorList, 100_000);
-
-                if (_cancellationSource.IsCancellationRequested)
+                if (_cancellationSource.IsCancellationRequested || _socket.Poll(100_000, SelectMode.SelectError))
                 {
                     return false;
                 }
 
-                if (readList.Count == 0)
+                if (!_socket.Poll(100_000, SelectMode.SelectRead))
                 {
                     continue;
                 }
@@ -134,7 +118,7 @@ namespace Codestellation.SolarWind
                 var count = bytesToReceive - position;
 
                 _readBuffer.Position += _tcpStream.Read(buffer, position, count);
-            }
+            } while (_readBuffer.Position < bytesToReceive);
 
             _readBuffer.Position = 0;
             _readBuffer.SetLength(bytesToReceive);
@@ -159,10 +143,8 @@ namespace Codestellation.SolarWind
         public void Dispose()
         {
             _cancellationSource.Cancel();
+            //writer must be stopped before reader because reader is responsible for closing socket.  
             _writer.Wait();
-            _tcpStream.Dispose();
-            _socket.Disconnect(false);
-            _socket.Dispose();
             _reader.Wait();
         }
     }
