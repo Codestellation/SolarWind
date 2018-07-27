@@ -1,5 +1,8 @@
 using System;
+using System.IO;
 using System.Net.Sockets;
+using System.Threading;
+using Codestellation.SolarWind.Internals;
 using FluentAssertions;
 using NUnit.Framework;
 
@@ -8,39 +11,74 @@ namespace Codestellation.SolarWind.Tests
     [TestFixture]
     public class ServerTests
     {
-        [Test]
-        public void PingPong()
+        private SolarWindHub _hub;
+        private Uri _uri;
+        private MemoryStream _messageBuffer;
+        private Message _message;
+
+        [SetUp]
+        public void Setup()
         {
             var options = new SolarWindHubOptions
             {
                 Callback = OnCallback,
-                Serializer = new JsonNetSerializer(),
-                OnAccept = OnAccept
+                Serializer = new JsonNetSerializer()
             };
-            var hub = new SolarWindHub(options);
-            var uri = new Uri("tcp://localhost:4312");
-            hub.Listen(uri);
+            _hub = new SolarWindHub(options);
+            _uri = new Uri("tcp://localhost:4312");
+            _hub.Listen(_uri);
 
-            var client = new TcpClient();
-            client.Connect(uri.Host, uri.Port);
+            _message = new Message(new MessageTypeId(1), new TextMessage {Text = "Greetings"});
+            _messageBuffer = new MemoryStream();
+
+            options.Serializer.SerializeMessage(_messageBuffer, in _message);
+        }
+
+        [TearDown]
+        public void TearDown() => _hub.Dispose();
+
+        [Test]
+        public void Should_respond_to_single_packet_message()
+        {
+            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            {
+                client.Connect(_uri.Host, _uri.Port);
+                client.Client.Send(_messageBuffer.GetBuffer(), 0, (int)_messageBuffer.Position, SocketFlags.None);
+
+                AssertReceived(client);
+            }
+        }
+
+        [Test]
+        public void Should_respond_to_multi_packet_message()
+        {
+            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            {
+                client.Connect(_uri.Host, _uri.Port);
+
+                const int chunkSize = 7;
+                for (var i = 0; i < 12; i++)
+                {
+                    client.Client.Send(_messageBuffer.GetBuffer(), i * chunkSize, chunkSize, SocketFlags.None);
+                    Thread.Sleep(100);
+                }
+
+    
+                AssertReceived(client);
+            }
+        }
+
+        private static void AssertReceived(TcpClient client)
+        {
             var buffer = new byte[512];
-
             var received = client.Client.Receive(buffer);
 
-            received.Should().BeGreaterThan(0);
+            received.Should().BeGreaterOrEqualTo(84);
             Console.WriteLine(received);
             Console.WriteLine(BitConverter.ToString(buffer, 0, received));
         }
 
-        private void OnCallback(Channel channel, Message message)
-        {
-        }
 
-        private void OnAccept(Channel channel)
-        {
-            var data = new TextMessage {Text = "Hello, Hub!"};
-            var message = new Message(new MessageTypeId(1), data);
-            channel.Post(message);
-        }
+        private void OnCallback(Channel channel, Message message) => channel.Post(message);
     }
 }
