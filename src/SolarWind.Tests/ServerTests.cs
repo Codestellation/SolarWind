@@ -40,9 +40,8 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void Should_respond_to_single_packet_message()
         {
-            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            using (TcpClient client = CreateClient())
             {
-                client.Connect(_uri.Host, _uri.Port);
                 client.Client.Send(_messageBuffer.GetBuffer(), 0, (int)_messageBuffer.Position, SocketFlags.None);
 
                 AssertReceived(client);
@@ -52,17 +51,14 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void Should_respond_to_multi_packet_message()
         {
-            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            using (TcpClient client = CreateClient())
             {
-                client.Connect(_uri.Host, _uri.Port);
-
                 const int chunkSize = 7;
                 for (var i = 0; i < 12; i++)
                 {
                     client.Client.Send(_messageBuffer.GetBuffer(), i * chunkSize, chunkSize, SocketFlags.None);
                     Thread.Sleep(100);
                 }
-
 
                 AssertReceived(client);
             }
@@ -72,10 +68,8 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void Should_handle_disconnect_gracefully()
         {
-            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            using (TcpClient client = CreateClient())
             {
-                client.Connect(_uri.Host, _uri.Port);
-
                 const int chunkSize = 7;
                 for (var i = 0; i < 12; i++)
                 {
@@ -92,9 +86,8 @@ namespace Codestellation.SolarWind.Tests
             }
 
 
-            using (var client = new TcpClient {ReceiveTimeout = 5000})
+            using (TcpClient client = CreateClient())
             {
-                client.Connect(_uri.Host, _uri.Port);
                 client.Client.Send(_messageBuffer.GetBuffer(), 0, (int)_messageBuffer.Position, SocketFlags.None);
 
                 AssertReceived(client);
@@ -113,5 +106,12 @@ namespace Codestellation.SolarWind.Tests
 
 
         private void OnCallback(Channel channel, Message message) => channel.Post(message);
+
+        private TcpClient CreateClient()
+        {
+            var client = new TcpClient {ReceiveTimeout = 5000};
+            client.Connect(_uri.Host, _uri.Port);
+            return client;
+        }
     }
 }
