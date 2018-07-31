@@ -2,6 +2,9 @@ using System;
 
 namespace Codestellation.SolarWind
 {
+    /// <summary>
+    /// MessageId is per channel, no
+    /// </summary>
     public struct MessageId : IEquatable<MessageId>
     {
         private readonly ulong _value;
@@ -22,5 +25,7 @@ namespace Codestellation.SolarWind
         public static bool operator ==(MessageId left, MessageId right) => left.Equals(right);
 
         public static bool operator !=(MessageId left, MessageId right) => !left.Equals(right);
+
+        public MessageId Next() => new MessageId(_value + 1);
     }
 }
