@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -18,10 +17,10 @@ namespace Codestellation.SolarWind
 
         private readonly Task _reader;
         private readonly Task _writer;
-        private readonly BlockingCollection<Message> _outgoings;
         private readonly MemoryStream _writeBuffer;
         private readonly MemoryStream _readBuffer;
         private readonly CancellationTokenSource _cancellationSource;
+        private readonly Session _session;
 
 
         public static Channel Server(Socket socket, SolarWindHubOptions options)
@@ -51,8 +50,9 @@ namespace Codestellation.SolarWind
             _tcpStream = tcpStream;
             _options = options;
 
+
+            _session = new Session();
             _cancellationSource = new CancellationTokenSource();
-            _outgoings = new BlockingCollection<Message>();
 
             _writeBuffer = new MemoryStream(1024);
             _readBuffer = new MemoryStream(1024);
@@ -61,7 +61,7 @@ namespace Codestellation.SolarWind
             _writer = StartWritingTask();
         }
 
-        public void Post(Message message) => _outgoings.Add(message);
+        public MessageId Post(Message message) => _session.Enqueue(message);
 
         private Task StartReadingTask() => Task.Run(() =>
         {
@@ -125,20 +125,25 @@ namespace Codestellation.SolarWind
             return true;
         }
 
-        private Task StartWritingTask() => Task.Run(() =>
+        private async Task StartWritingTask()
         {
-            try
+            while (!_cancellationSource.IsCancellationRequested)
             {
-                foreach (Message message in _outgoings.GetConsumingEnumerable(_cancellationSource.Token))
+                //TODO: Make a synchronous path for cases where message is already available
+                ValueTask<(MessageId, Message)> valueTask = _session.Dequeue(_cancellationSource.Token);
+
+                try
                 {
+                    (MessageId messageId, Message message) = await valueTask.ConfigureAwait(false);
                     _options.Serializer.SerializeMessage(_writeBuffer, in message);
                     _tcpStream.Write(_writeBuffer.GetBuffer(), 0, (int)_writeBuffer.Position);
                 }
+                catch (OperationCanceledException e)
+                {
+                    return;
+                }
             }
-            catch (OperationCanceledException)
-            {
-            }
-        });
+        }
 
         public void Dispose()
         {

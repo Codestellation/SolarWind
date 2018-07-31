@@ -42,19 +42,19 @@ namespace Codestellation.SolarWind
         public void Ack(MessageId messageId) => _sent.Remove(messageId);
 
         public ValueTask<(MessageId, Message)> Dequeue(CancellationToken cancellation) =>
-            !_awaiter.Wait(0) ? AwaitNewMessages() : DoDequeue();
+            !_awaiter.Wait(0) ? AwaitNewMessages(cancellation) : DoDequeue(cancellation);
 
-        private async ValueTask<(MessageId, Message)> AwaitNewMessages()
+        private async ValueTask<(MessageId, Message)> AwaitNewMessages(CancellationToken cancellation)
         {
-            await _awaiter.WaitAsync().ConfigureAwait(false);
-            return await DoDequeue();
+            await _awaiter.WaitAsync(cancellation).ConfigureAwait(false);
+            return await DoDequeue(cancellation);
         }
 
-        private ValueTask<(MessageId, Message)> DoDequeue()
+        private ValueTask<(MessageId, Message)> DoDequeue(CancellationToken cancellation)
         {
             if (!_asyncLock.Wait(0))
             {
-                return AwaitLock();
+                return AwaitLock(cancellation);
             }
 
             (MessageId messageId, Message message) = _queue.Dequeue();
@@ -63,9 +63,9 @@ namespace Codestellation.SolarWind
             return new ValueTask<(MessageId, Message)>((messageId, message));
         }
 
-        private async ValueTask<(MessageId, Message)> AwaitLock()
+        private async ValueTask<(MessageId, Message)> AwaitLock(CancellationToken cancellation)
         {
-            await _asyncLock.WaitAsync().ConfigureAwait(false);
+            await _asyncLock.WaitAsync(cancellation).ConfigureAwait(false);
             (MessageId messageId, Message message) = _queue.Dequeue();
             _sent.Add(messageId, message);
             _asyncLock.Release();
