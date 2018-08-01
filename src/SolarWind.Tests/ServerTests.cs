@@ -15,6 +15,7 @@ namespace Codestellation.SolarWind.Tests
         private Uri _uri;
         private MemoryStream _messageBuffer;
         private Message _message;
+        private HubId _clientHubId;
 
         [SetUp]
         public void Setup()
@@ -31,7 +32,9 @@ namespace Codestellation.SolarWind.Tests
             _message = new Message(new MessageTypeId(1), new TextMessage {Text = "Greetings"});
             _messageBuffer = new MemoryStream();
 
-            options.Serializer.SerializeMessage(_messageBuffer, in _message);
+            options.Serializer.SerializeMessage(_messageBuffer, in _message, default);
+
+            _clientHubId = new HubId("client");
         }
 
         [TearDown]
@@ -78,6 +81,7 @@ namespace Codestellation.SolarWind.Tests
 
                     if (i == 5)
                     {
+                        client.Client.Disconnect(true);
                         client.Dispose();
                     }
 
@@ -85,6 +89,7 @@ namespace Codestellation.SolarWind.Tests
                 }
             }
 
+            Thread.Sleep(1000);
 
             using (TcpClient client = CreateClient())
             {
@@ -97,8 +102,7 @@ namespace Codestellation.SolarWind.Tests
         private static void AssertReceived(TcpClient client)
         {
             var buffer = new byte[512];
-            var received = client.Client.Receive(buffer);
-
+            int received = client.Client.Receive(buffer);
             received.Should().BeGreaterOrEqualTo(84);
             Console.WriteLine(received);
             Console.WriteLine(BitConverter.ToString(buffer, 0, received));
@@ -111,6 +115,8 @@ namespace Codestellation.SolarWind.Tests
         {
             var client = new TcpClient {ReceiveTimeout = 5000};
             client.Connect(_uri.Host, _uri.Port);
+            client.GetStream().SendHandshake(_clientHubId);
+            HandshakeMessage _ = client.GetStream().ReceiveHandshake().Result;
             return client;
         }
     }

@@ -14,7 +14,9 @@ namespace Codestellation.SolarWind
         public readonly MessageId MessageId;
 
 
-        public Header(MessageTypeId messageTypeTypeId, PayloadSize payloadSize, MessageId messageId = default)
+        public bool IsHandshake => MessageTypeId == MessageTypeId.Handshake;
+
+        public Header(MessageTypeId messageTypeTypeId, PayloadSize payloadSize, MessageId messageId)
         {
             Version = 1;
             MessageTypeId = messageTypeTypeId;

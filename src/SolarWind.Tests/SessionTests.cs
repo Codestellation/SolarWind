@@ -16,14 +16,13 @@ namespace Codestellation.SolarWind.Tests
         {
             _session = new Session();
             _message = new Message(new MessageTypeId(1), new object());
-            _session.Enqueue(in _message);
         }
 
         [Test]
         public void Should_return_task_if_its_available()
         {
+            _session.Enqueue(in _message);
             ValueTask<(MessageId, Message)> dequeued = _session.Dequeue(CancellationToken.None);
-
             AssertDequeueResult(dequeued);
         }
 
@@ -47,7 +46,7 @@ namespace Codestellation.SolarWind.Tests
 
         private void FillSessionAsync() => Task.Run(() =>
         {
-            Task.Delay(500);
+            Thread.Sleep(500);
             _session.Enqueue(in _message);
         });
     }

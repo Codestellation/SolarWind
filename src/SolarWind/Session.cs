@@ -39,7 +39,12 @@ namespace Codestellation.SolarWind
             return _currentMessageId;
         }
 
-        public void Ack(MessageId messageId) => _sent.Remove(messageId);
+        public void Ack(MessageId messageId)
+        {
+            _asyncLock.Wait();
+            _sent.Remove(messageId);
+            _asyncLock.Release();
+        }
 
         public ValueTask<(MessageId, Message)> Dequeue(CancellationToken cancellation) =>
             !_awaiter.Wait(0) ? AwaitNewMessages(cancellation) : DoDequeue(cancellation);

@@ -15,11 +15,11 @@ namespace Codestellation.SolarWind
         /// <summary>
         /// Used to identify application level connections and preserve session between reconnections.
         /// </summary>
-        public string HubId { get; set; }
+        public HubId HubId { get; set; }
 
         public SolarWindHubOptions()
         {
-            HubId = $"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}";
+            HubId = new HubId($"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}");
         }
 
 

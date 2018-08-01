@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
-    <!--<TargetFrameworks>netcoreapp2.1;net472</TargetFrameworks>-->
+    <!--<TargetFramework>net472</TargetFramework>-->
+    <TargetFrameworks>netcoreapp2.1;net472</TargetFrameworks>
     <AssemblyName>Codestellation.SolarWind.Tests</AssemblyName>
     <RootNamespace>Codestellation.SolarWind.Tests</RootNamespace>
     <IsPackable>false</IsPackable>

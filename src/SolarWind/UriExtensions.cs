@@ -7,6 +7,11 @@ namespace Codestellation.SolarWind
 {
     public static class UriExtensions
     {
+        public const string Tcp = "tcp";
+        public const string Tls = "tls";
+
+        public static bool UseTls(this Uri uri) => string.Equals(uri.Scheme, Tls, StringComparison.OrdinalIgnoreCase);
+
         public static IPEndPoint ResolveLocalEndpoint(this Uri localUri)
         {
             Uri uri = HandleWildcard(localUri);

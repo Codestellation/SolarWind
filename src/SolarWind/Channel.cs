@@ -1,8 +1,6 @@
 using System;
 using System.IO;
-using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Authentication;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -23,26 +21,9 @@ namespace Codestellation.SolarWind
         private readonly Session _session;
 
 
-        public static Channel Server(Socket socket, SolarWindHubOptions options)
-        {
-            Stream networkStream = new NetworkStream(socket);
-            if (options.Certificate != null)
-            {
-                //TODO: Try accomplish this async later
-                var sslStream = new SslStream(networkStream);
-                sslStream.AuthenticateAsServer(options.Certificate, false, SslProtocols.Tls12, true);
-                networkStream = sslStream;
-            }
+        public static Channel Server(Socket socket, Stream networkStream, SolarWindHubOptions options) => new Channel(socket, networkStream, options);
 
-            return new Channel(socket, networkStream, options);
-        }
-
-        public static Channel Client(Socket socket, SolarWindHubOptions options)
-        {
-            //TODO: How to connect using TLS?
-            var stream = new NetworkStream(socket);
-            return new Channel(socket, stream, options);
-        }
+        public static Channel Client(Socket socket, Stream networkStream, SolarWindHubOptions options) => new Channel(socket, networkStream, options);
 
         private Channel(Socket socket, Stream tcpStream, SolarWindHubOptions options)
         {
@@ -102,8 +83,10 @@ namespace Codestellation.SolarWind
 
             do
             {
+                //TODO: Anylyze how socket error works. 
                 if (_cancellationSource.IsCancellationRequested || _socket.Poll(100_000, SelectMode.SelectError))
                 {
+                    //TODO: Find a better way to 
                     return false;
                 }
 
@@ -115,7 +98,7 @@ namespace Codestellation.SolarWind
                 byte[] buffer = _readBuffer.GetBuffer();
 
                 var position = (int)_readBuffer.Position;
-                var count = bytesToReceive - position;
+                int count = bytesToReceive - position;
 
                 _readBuffer.Position += _tcpStream.Read(buffer, position, count);
             } while (_readBuffer.Position < bytesToReceive);
@@ -129,16 +112,19 @@ namespace Codestellation.SolarWind
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
-                //TODO: Make a synchronous path for cases where message is already available
+                //TODO: Make a synchronous path for cases where message is already available without usage of ValueTask (it's a huge structure)
                 ValueTask<(MessageId, Message)> valueTask = _session.Dequeue(_cancellationSource.Token);
 
                 try
                 {
-                    (MessageId messageId, Message message) = await valueTask.ConfigureAwait(false);
-                    _options.Serializer.SerializeMessage(_writeBuffer, in message);
+                    (MessageId messageId, Message message) = valueTask.IsCompletedSuccessfully
+                        ? valueTask.Result
+                        : await valueTask.ConfigureAwait(false);
+
+                    _options.Serializer.SerializeMessage(_writeBuffer, in message, messageId);
                     _tcpStream.Write(_writeBuffer.GetBuffer(), 0, (int)_writeBuffer.Position);
                 }
-                catch (OperationCanceledException e)
+                catch (OperationCanceledException)
                 {
                     return;
                 }
@@ -151,6 +137,11 @@ namespace Codestellation.SolarWind
             //writer must be stopped before reader because reader is responsible for closing socket.  
             _writer.Wait();
             _reader.Wait();
+        }
+
+        public void OnReconnect(Socket socket, Stream networkStream)
+        {
+            //TODO: replace socket and 
         }
     }
 }
