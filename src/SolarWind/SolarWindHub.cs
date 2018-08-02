@@ -1,11 +1,7 @@
 using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Net.Security;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
-using Codestellation.SolarWind.Misc;
 
 namespace Codestellation.SolarWind
 {
@@ -20,38 +16,22 @@ namespace Codestellation.SolarWind
         {
             _options = options.Clone();
             _channels = new ConcurrentDictionary<ChannelId, Channel>();
-            _listener = new Listener(_options, (hubId, socket, stream) => OnChannelAccepted(hubId, socket, stream));
+            _listener = new Listener(_options, (hubId, connection) => OnChannelAccepted(hubId, connection));
         }
 
         public void Listen(Uri uri) => _listener.Listen(uri);
 
         public async Task<Channel> Connect(Uri remoteUri)
         {
-            Socket socket = Build.TcpIPv4();
-            socket.Connect(remoteUri.ResolveRemoteEndpoint());
-            var networkStream = new NetworkStream(socket);
-            if (remoteUri.UseTls())
-            {
-                var sslStream = new SslStream(networkStream);
-                await sslStream
-                    .AuthenticateAsClientAsync(remoteUri.Host)
-                    .ConfigureAwait(false);
-
-                if (!sslStream.IsAuthenticated)
-                {
-                    //TODO: Close stream and say goodbye. 
-                }
-            }
-
-            await networkStream
-                .SendHandshake(_options.HubId)
+            Connection connection = await Connection
+                .ConnectTo(remoteUri)
                 .ConfigureAwait(false);
 
-            HandshakeMessage handshakeResponse = await networkStream
-                .ReceiveHandshake()
+            HandshakeMessage handshakeResponse = await connection
+                .HandshakeAsClient(_options.HubId)
                 .ConfigureAwait(false);
 
-            return OnChannelAccepted(handshakeResponse.HubId, socket, networkStream);
+            return OnChannelAccepted(handshakeResponse.HubId, connection);
         }
 
 
@@ -63,22 +43,16 @@ namespace Codestellation.SolarWind
             _listener.Dispose();
         }
 
-        private Channel OnChannelAccepted(HubId remoteHubId, Socket socket, Stream networkStream)
+        private Channel OnChannelAccepted(HubId remoteHubId, Connection connection)
         {
             var channelId = new ChannelId(_options.HubId, remoteHubId);
-
-            if (_channels.TryGetValue(channelId, out Channel channel))
+            if (_channels.TryGetValue(channelId, out Channel channel) || _channels.TryAdd(channelId, channel = new Channel(_options)))
             {
-                channel.OnReconnect(socket, networkStream);
+                channel.OnReconnect(connection);
+                return channel;
             }
 
-            channel = Channel.Server(socket, networkStream, _options);
-            if (!_channels.TryAdd(channelId, channel))
-            {
-                throw new InvalidOperationException("Channel was not open neither reconnected. This should never happen");
-            }
-
-            return channel;
+            throw new InvalidOperationException("Channel was not open neither reconnected. This should never happen");
         }
     }
 }

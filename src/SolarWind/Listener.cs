@@ -1,9 +1,6 @@
 using System;
-using System.IO;
 using System.Net;
-using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Authentication;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -14,12 +11,12 @@ namespace Codestellation.SolarWind
     public class Listener : IDisposable
     {
         private readonly SolarWindHubOptions _options;
-        private readonly Action<HubId, Socket, Stream> _onAccepted;
+        private readonly Action<HubId, Connection> _onAccepted;
         private readonly Thread _listenerThread;
         private readonly Socket _listener;
         private bool _disposed;
 
-        public Listener(SolarWindHubOptions options, Action<HubId, Socket, Stream> onAccepted)
+        public Listener(SolarWindHubOptions options, Action<HubId, Connection> onAccepted)
         {
             _options = options;
             _onAccepted = onAccepted;
@@ -61,40 +58,15 @@ namespace Codestellation.SolarWind
 
         private async Task DoHandshake(Socket socket)
         {
-            //TODO: TLS Authentication
-            Stream networkStream = new NetworkStream(socket, true);
-            if (_options.Certificate != null)
-            {
-                //TODO: Try accomplish this async later
-                var sslStream = new SslStream(networkStream, false);
-                await sslStream
-                    .AuthenticateAsServerAsync(_options.Certificate, false, SslProtocols.Tls12, true)
-                    .ConfigureAwait(false);
-
-                if (!sslStream.IsAuthenticated)
-                {
-                    sslStream.Close();
-                    return;
-                }
-
-                networkStream = sslStream;
-            }
-
-            HandshakeMessage incoming = await networkStream
-                .ReceiveHandshake()
+            Connection connection = await Connection
+                .Accept(socket)
                 .ConfigureAwait(false);
 
-            if (incoming == null)
-            {
-                networkStream.Close();
-                return;
-            }
-
-            await networkStream
-                .SendHandshake(_options.HubId)
+            HandshakeMessage incoming = await connection
+                .HandshakeAsServer(_options.HubId)
                 .ConfigureAwait(false);
 
-            _onAccepted(incoming.HubId, socket, networkStream);
+            _onAccepted(incoming.HubId, connection);
         }
 
         public void Dispose()

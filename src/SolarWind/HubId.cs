@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Codestellation.SolarWind
 {
@@ -13,7 +13,7 @@ namespace Codestellation.SolarWind
                 : id;
         }
 
-        public bool Equals(HubId other) => string.Equals(Id, other.Id);
+        public bool Equals(HubId other) => string.Equals(Id, other.Id, StringComparison.Ordinal);
 
         public override bool Equals(object obj) => obj is HubId id && Equals(id);
 
