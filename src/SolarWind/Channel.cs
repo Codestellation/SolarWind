@@ -71,23 +71,29 @@ namespace Codestellation.SolarWind
 
         private async Task StartWritingTask()
         {
-            while (!_cancellationSource.IsCancellationRequested)
+            CancellationToken cancellation = _cancellationSource.Token;
+            using (cancellation.Register(() => _session.Cancel()))
             {
-                //TODO: Make a synchronous path for cases where message is already available without usage of ValueTask (it's a huge structure)
-                ValueTask<(MessageId, Message)> valueTask = _session.Dequeue(_cancellationSource.Token);
-
-                try
+                while (!_cancellationSource.IsCancellationRequested)
                 {
-                    (MessageId messageId, Message message) = valueTask.IsCompletedSuccessfully
-                        ? valueTask.Result
-                        : await valueTask.ConfigureAwait(false);
+                    //TODO: Make a synchronous path for cases where message is already available without usage of ValueTask (it's a huge structure)
 
-                    _options.Serializer.SerializeMessage(_writeBuffer, in message, messageId);
-                    _connection.Write(_writeBuffer.GetBuffer(), 0, (int)_writeBuffer.Position);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
+                    try
+                    {
+                        if (!_session.TryDequeueSync(out MessageId messageId, out Message message))
+                        {
+                            (messageId, message) = await _session
+                                .DequeueAsync(cancellation)
+                                .ConfigureAwait(false);
+                        }
+
+                        _options.Serializer.SerializeMessage(_writeBuffer, in message, messageId);
+                        _connection.Write(_writeBuffer.GetBuffer(), 0, (int)_writeBuffer.Position);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
                 }
             }
         }

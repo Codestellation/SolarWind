@@ -22,8 +22,10 @@ namespace Codestellation.SolarWind.Tests
         public void Should_return_task_if_its_available()
         {
             _session.Enqueue(in _message);
-            ValueTask<(MessageId, Message)> dequeued = _session.Dequeue(CancellationToken.None);
-            AssertDequeueResult(dequeued);
+            bool result = _session.TryDequeueSync(out MessageId messageId, out Message message);
+
+            result.Should().BeTrue();
+            message.Should().BeEquivalentTo(_message);
         }
 
         [Test]
@@ -31,18 +33,16 @@ namespace Codestellation.SolarWind.Tests
         {
             FillSessionAsync();
 
-            ValueTask<(MessageId, Message)> dequeued = _session.Dequeue(CancellationToken.None);
 
-            await dequeued;
+            bool result = _session.TryDequeueSync(out MessageId messageId, out Message message);
 
-            AssertDequeueResult(dequeued);
+            result.Should().BeFalse();
+
+            (messageId, message) = await _session.DequeueAsync(CancellationToken.None);
+
+            message.Should().BeEquivalentTo(_message);
         }
 
-        private void AssertDequeueResult(ValueTask<(MessageId, Message)> dequeued)
-        {
-            dequeued.IsCompletedSuccessfully.Should().BeTrue();
-            dequeued.Result.Item2.Should().BeEquivalentTo(_message);
-        }
 
         private void FillSessionAsync() => Task.Run(() =>
         {

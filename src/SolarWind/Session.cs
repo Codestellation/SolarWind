@@ -10,71 +10,80 @@ namespace Codestellation.SolarWind
         private readonly Dictionary<MessageId, Message> _sent;
 
         private MessageId _currentMessageId;
-        private readonly SemaphoreSlim _asyncLock;
-        private readonly SemaphoreSlim _awaiter;
+        private TaskCompletionSource<(MessageId, Message)> _completionSource;
 
         public Session()
         {
             _queue = new Queue<(MessageId, Message)>();
             //Keep some sent messages until ACK received to be able to resend them in case of failure
             _sent = new Dictionary<MessageId, Message>();
-            _asyncLock = new SemaphoreSlim(1);
-            _awaiter = new SemaphoreSlim(0);
         }
 
         public MessageId Enqueue(in Message message)
         {
-            _asyncLock.Wait();
-            try
+            lock (_queue)
             {
                 _currentMessageId = _currentMessageId.Next();
-                _queue.Enqueue((_currentMessageId, message));
-                _awaiter.Release();
-            }
-            finally
-            {
-                _asyncLock.Release();
-            }
 
-            return _currentMessageId;
+                if (_completionSource == null)
+                {
+                    _queue.Enqueue((_currentMessageId, message));
+                }
+                else
+                {
+                    _sent.Add(_currentMessageId, message);
+                    _completionSource.SetResult((_currentMessageId, message));
+                    _completionSource = null;
+                }
+
+                return _currentMessageId;
+            }
         }
 
         public void Ack(MessageId messageId)
         {
-            _asyncLock.Wait();
-            _sent.Remove(messageId);
-            _asyncLock.Release();
-        }
-
-        public ValueTask<(MessageId, Message)> Dequeue(CancellationToken cancellation) =>
-            !_awaiter.Wait(0) ? AwaitNewMessages(cancellation) : DoDequeue(cancellation);
-
-        private async ValueTask<(MessageId, Message)> AwaitNewMessages(CancellationToken cancellation)
-        {
-            await _awaiter.WaitAsync(cancellation).ConfigureAwait(false);
-            return await DoDequeue(cancellation);
-        }
-
-        private ValueTask<(MessageId, Message)> DoDequeue(CancellationToken cancellation)
-        {
-            if (!_asyncLock.Wait(0))
+            lock (_queue)
             {
-                return AwaitLock(cancellation);
+                _sent.Remove(messageId);
+            }
+        }
+
+        public bool TryDequeueSync(out MessageId messageId, out Message message)
+        {
+            if (Monitor.TryEnter(_queue))
+            {
+                if (_queue.Count > 0)
+                {
+                    (messageId, message) = _queue.Dequeue();
+                    _sent.Add(messageId, message);
+                    return true;
+                }
+
+                Monitor.Exit(_queue);
             }
 
-            (MessageId messageId, Message message) = _queue.Dequeue();
-            _sent.Add(messageId, message);
-            _asyncLock.Release();
-            return new ValueTask<(MessageId, Message)>((messageId, message));
+            messageId = default;
+            message = default;
+            return false;
         }
 
-        private async ValueTask<(MessageId, Message)> AwaitLock(CancellationToken cancellation)
+        //TODO: Replace with ValueTask<> with usage of IValueTaskSource (don't have to have pool, it's supposed to be used be the only reader)
+        public Task<(MessageId, Message)> DequeueAsync(CancellationToken token)
         {
-            await _asyncLock.WaitAsync(cancellation).ConfigureAwait(false);
-            (MessageId messageId, Message message) = _queue.Dequeue();
-            _sent.Add(messageId, message);
-            _asyncLock.Release();
-            return (messageId, message);
+            lock (_queue)
+            {
+                if (_queue.Count > 0)
+                {
+                    (MessageId id, Message message) = _queue.Dequeue();
+                    _sent.Add(id, message);
+                    return Task.FromResult((id, message));
+                }
+
+                _completionSource = new TaskCompletionSource<(MessageId, Message)>(TaskCreationOptions.RunContinuationsAsynchronously);
+                return _completionSource.Task;
+            }
         }
+
+        public void Cancel() => Volatile.Read(ref _completionSource)?.TrySetCanceled();
     }
 }
