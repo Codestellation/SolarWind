@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!--<TargetFramework>net472</TargetFramework>-->
     <TargetFrameworks>netcoreapp2.1;net472</TargetFrameworks>
@@ -19,8 +19,12 @@
     <PackageReference Include="NUnit" Version="3.8.1" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.8.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.7" />
+    <PackageReference Include="System.Buffers" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SolarWind\SolarWind.csproj" />
   </ItemGroup>
+
+  
+
 </Project>
