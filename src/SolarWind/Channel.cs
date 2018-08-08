@@ -95,11 +95,13 @@ namespace Codestellation.SolarWind
                     break;
                 }
             }
-
-            //_writerFinished.Set();
         }
 
-        public void Dispose() => Stop();
+        public void Dispose()
+        {
+            Stop();
+            _session.Dispose();
+        }
 
         private void Stop()
         {

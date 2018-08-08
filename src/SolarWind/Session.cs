@@ -16,48 +16,48 @@ namespace Codestellation.SolarWind
 
         private MessageId _currentMessageId;
         private readonly AwaitableQueue<Message> _incomingQueue;
-        private readonly Task _deserializationTask;
+        private readonly Task _deserialization;
+        private readonly CancellationTokenSource _disposal;
 
         public Session(Channel channel)
         {
             _channel = channel;
             _outgoingQueue = new AwaitableQueue<Message>();
             _incomingQueue = new AwaitableQueue<Message>();
+            _disposal = new CancellationTokenSource();
 
             //Keep some sent messages until ACK received to be able to resend them in case of failure
             _sent = new Dictionary<MessageId, Message>();
-
-            _deserializationTask = StartDeserializationTask();
+            _deserialization = StartDeserializationTask();
         }
 
-        private Task StartDeserializationTask() => Task.Run((Action)DeserializeAndCallback);
-
-        private async void DeserializeAndCallback()
+        private async Task StartDeserializationTask()
         {
             //TODO: Handle exception to avoid exiting deserialization thread
             //TODO: Implement graceful shutdown
-            while (true)
+            while (!_disposal.IsCancellationRequested)
             {
                 object data;
                 Message incoming;
-                using (incoming = await _incomingQueue.Await(CancellationToken.None).ConfigureAwait(false))
+                using (incoming = await _incomingQueue.Await(_disposal.Token).ConfigureAwait(false))
                 {
                     data = _channel.Options.Serializer.Deserialize(incoming.Header.TypeId, incoming.Payload);
                 }
 
-                _channel.Options.Callback(_channel, incoming.Header, data);
+                try
+                {
+                    _channel.Options.Callback(_channel, incoming.Header, data);
+                }
+                catch (Exception e)
+                {
+                    //Use better logging
+                    Console.WriteLine(e);
+                }
             }
         }
 
 
-        public void EnqueueIncoming(in Message message)
-        {
-            lock (_incomingQueue)
-            {
-                _incomingQueue.Enqueue(message);
-                Monitor.Pulse(_incomingQueue);
-            }
-        }
+        public void EnqueueIncoming(in Message message) => _incomingQueue.Enqueue(message);
 
         public MessageId EnqueueOutgoing(MessageTypeId typeId, PooledMemoryStream payload)
         {
@@ -97,17 +97,9 @@ namespace Codestellation.SolarWind
             return result;
         }
 
-        //public void Cancel() => Volatile.Read(ref _completionSource)?.TrySetCanceled();
-        public void Cancel()
-        {
-        }
-
         public void Dispose()
         {
-            //TODO: Dispose messages in queues.
-
-            _channel?.Dispose();
-            _deserializationTask?.Dispose();
+            //TODO: Think how to dispose it in a correct manner
         }
     }
 }
