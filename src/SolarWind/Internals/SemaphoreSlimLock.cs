@@ -1,19 +1,21 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Codestellation.SolarWind.Internals
 {
-    public struct SemaphoreSlimLock : IDisposable
+    public readonly struct SemaphoreSlimLock : IDisposable
     {
         private readonly SemaphoreSlim _semaphore;
         private readonly bool _lockTaken;
 
         private SemaphoreSlimLock(SemaphoreSlim semaphore, bool lockTaken)
         {
-            _semaphore = semaphore ?? throw new ArgumentNullException(nameof(semaphore));
+            _semaphore = semaphore;
             _lockTaken = lockTaken;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Dispose()
         {
             if (_lockTaken)
@@ -22,6 +24,7 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static SemaphoreSlimLock Lock(SemaphoreSlim semaphore)
         {
             semaphore.Wait();

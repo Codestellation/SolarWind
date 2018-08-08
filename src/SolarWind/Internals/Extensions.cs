@@ -1,4 +1,3 @@
-﻿using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -7,16 +6,17 @@ namespace Codestellation.SolarWind.Internals
 {
     public static class Extensions
     {
-        public static void SerializeMessage(this ISerializer self, MemoryStream stream, in Message message, MessageId messageId)
+        //TODO: Currently it's used for test only. Consider ditching it or moving to the test assembly
+        public static void SerializeMessage(this ISerializer self, MemoryStream stream, in MessageHeader header, object data)
         {
-            stream.SetLength(Header.Size);
-            stream.Position = Header.Size;
+            stream.SetLength(WireHeader.Size);
+            stream.Position = WireHeader.Size;
 
-            self.Serialize(message.Payload, stream);
+            self.Serialize(data, stream);
 
-            var header = new Header(message.MessageTypeId, PayloadSize.From(stream, Header.Size), messageId);
+            var wireHeader = new WireHeader(header, PayloadSize.From(stream, WireHeader.Size));
             byte[] buffer = stream.GetBuffer();
-            Header.WriteTo(in header, buffer);
+            WireHeader.WriteTo(in wireHeader, buffer);
         }
 
         public static Task SendHandshake(this Stream networkStream, HubId hubId)
@@ -24,55 +24,57 @@ namespace Codestellation.SolarWind.Internals
             //TODO: Use buffer pool one day
             var buffer = new byte[1024];
             //TODO: Check where we have written all the text
-            int payloadSize = Encoding.UTF8.GetBytes(hubId.Id, 0, hubId.Id.Length, buffer, Header.Size);
-
-            var outgoingHeader = new Header(MessageTypeId.Handshake, new PayloadSize(payloadSize), default);
-            Header.WriteTo(in outgoingHeader, buffer);
-            return networkStream.WriteAsync(buffer, 0, Header.Size + payloadSize);
+            int payloadSize = Encoding.UTF8.GetBytes(hubId.Id, 0, hubId.Id.Length, buffer, WireHeader.Size);
+            var msgHeader = new MessageHeader(MessageTypeId.Handshake, MessageId.Empty);
+            var outgoingHeader = new WireHeader(msgHeader, new PayloadSize(payloadSize));
+            WireHeader.WriteTo(in outgoingHeader, buffer);
+            return networkStream.WriteAsync(buffer, 0, WireHeader.Size + payloadSize);
         }
 
         public static async Task<HandshakeMessage> ReceiveHandshake(this Stream self)
         {
-            //TODO: Use buffer pool
-            var buffer = new byte[1024];
-
-            if (!await ReceiveBytesAsync(self, Header.Size, buffer).ConfigureAwait(false))
-            {
-                return null;
-            }
-
-            Header header = Header.ReadFrom(buffer);
-
-            if (!header.IsHandshake)
-            {
-                return null;
-            }
-
-            if (!await ReceiveBytesAsync(self, header.PayloadSize.Value, buffer).ConfigureAwait(false))
-            {
-                return null;
-            }
-
-            return HandshakeMessage.ReadFrom(buffer, header.PayloadSize.Value);
-        }
-
-        private static async Task<bool> ReceiveBytesAsync(this Stream self, int bytes, byte[] buffer)
-        {
-            var received = 0;
-            //TODO: Handle errors and timeouts. 
+            PooledMemoryStream buffer = PooledMemoryStream.Rent();
             try
             {
-                do
+                if (!await ReceiveBytesAsync(self, WireHeader.Size, buffer).ConfigureAwait(false))
                 {
-                    received += await self
-                        .ReadAsync(buffer, received, bytes - received)
-                        .ConfigureAwait(false);
-                } while (received < bytes);
+                    return null;
+                }
+
+                WireHeader wireHeader = WireHeader.ReadFrom(buffer);
+
+                buffer.CompleteRead();
+                buffer.Reset();
+
+                if (!wireHeader.IsHandshake)
+                {
+                    return null;
+                }
+
+                if (!await ReceiveBytesAsync(self, wireHeader.PayloadSize.Value, buffer).ConfigureAwait(false))
+                {
+                    return null;
+                }
+
+                return HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
             }
-            catch (Exception)
+            finally
             {
-                return false;
+                buffer.CompleteRead();
+                buffer.CompleteWrite();
+                PooledMemoryStream.Return(buffer);
             }
+        }
+
+        private static async Task<bool> ReceiveBytesAsync(this Stream self, int bytesToReceive, PooledMemoryStream readBuffer)
+        {
+            int left = bytesToReceive;
+            do
+            {
+                left -= readBuffer.WriteFrom(self, left);
+            } while (left != 0);
+
+            readBuffer.CompleteWrite();
 
             return true;
         }

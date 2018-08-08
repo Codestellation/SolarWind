@@ -1,5 +1,7 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Internals;
 using FluentAssertions;
 using NUnit.Framework;
 
@@ -9,23 +11,34 @@ namespace Codestellation.SolarWind.Tests
     public class SessionTests
     {
         private Session _session;
-        private Message _message;
+        private PooledMemoryStream _payload;
+        private MessageTypeId _messageTypeId;
 
         [SetUp]
         public void Setup()
         {
-            _session = new Session();
-            _message = new Message(new MessageTypeId(1), new object());
+            var channel = new Channel(new SolarWindHubOptions());
+            _session = new Session(channel);
+            _payload = PooledMemoryStream.Rent();
+            _payload.CompleteWrite();
+            _payload.CompleteRead();
+
+            _messageTypeId = new MessageTypeId(1);
         }
+
+        [TearDown]
+        public void Teardown() => PooledMemoryStream.Return(_payload);
 
         [Test]
         public void Should_return_task_if_its_available()
         {
-            _session.Enqueue(in _message);
-            bool result = _session.TryDequeueSync(out MessageId messageId, out Message message);
+            MessageId id = _session.EnqueueOutgoing(_messageTypeId, _payload);
+
+            bool result = _session.TryDequeueSync(out Message message);
 
             result.Should().BeTrue();
-            message.Should().BeEquivalentTo(_message);
+
+            message.Should().BeEquivalentTo(new Message(new MessageHeader(_messageTypeId, id), _payload));
         }
 
         [Test]
@@ -33,21 +46,20 @@ namespace Codestellation.SolarWind.Tests
         {
             FillSessionAsync();
 
-
-            bool result = _session.TryDequeueSync(out MessageId messageId, out Message message);
+            bool result = _session.TryDequeueSync(out Message message);
 
             result.Should().BeFalse();
 
-            (messageId, message) = await _session.DequeueAsync(CancellationToken.None);
+            message = await _session.DequeueAsync(CancellationToken.None);
 
-            message.Should().BeEquivalentTo(_message);
+            message.Should().BeEquivalentTo(new Message(new MessageHeader(_messageTypeId, new MessageId(1)), _payload));
         }
 
 
         private void FillSessionAsync() => Task.Run(() =>
         {
             Thread.Sleep(500);
-            _session.Enqueue(in _message);
+            _session.EnqueueOutgoing(_messageTypeId, _payload);
         });
     }
 }

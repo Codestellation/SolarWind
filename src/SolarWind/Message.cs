@@ -1,14 +1,27 @@
+using System;
+using Codestellation.SolarWind.Internals;
+
 namespace Codestellation.SolarWind
 {
-    public readonly struct Message
+    public readonly struct Message : IDisposable
     {
-        public readonly MessageTypeId MessageTypeId;
-        public readonly object Payload;
+        public readonly MessageHeader Header;
+        public readonly PooledMemoryStream Payload;
 
-        public Message(MessageTypeId messageTypeId, object payload)
+        public Message(MessageHeader header, PooledMemoryStream payload)
         {
-            MessageTypeId = messageTypeId;
+            Header = header;
             Payload = payload;
+        }
+
+        public void Dispose()
+        {
+            if (Payload != null)
+            {
+                Payload.CompleteWrite();
+                Payload.CompleteRead();
+                PooledMemoryStream.Return(Payload);
+            }
         }
     }
 }

@@ -10,21 +10,39 @@ namespace Codestellation.SolarWind.Internals
         public static PooledMemoryStream Rent()
         {
             PooledMemoryStream pooledMemoryStream = Pool.Rent();
-            pooledMemoryStream.Init();
+            if (pooledMemoryStream.Length > 0)
+            {
+                throw new InvalidOperationException("Stream was not cleaned gracefully");
+            }
+
             return pooledMemoryStream;
         }
 
-        private void Init() => _memory = MemoryOwner.Rent();
+        public static void Return(PooledMemoryStream stream)
+        {
+            stream.Reset();
+            Pool.Return(stream);
+        }
+
+        public void Reset()
+        {
+            _length = 0;
+            _memory.Reset();
+        }
+
+        private readonly MemoryOwner _memory;
+
+        private long _length;
 
         private PooledMemoryStream()
         {
+            _memory = new MemoryOwner();
         }
 
-        private MemoryOwner _memory;
-        private long _length;
-
         public override bool CanRead { get; } = true;
+
         public override bool CanWrite { get; } = true;
+
         public override bool CanSeek { get; } = false;
 
         public override long Length => _length;
@@ -39,12 +57,31 @@ namespace Codestellation.SolarWind.Internals
         {
         }
 
-        public override void Write(byte[] buffer, int offset, int count) => _memory.Write(buffer, offset, count);
+        public void Write(Memory<byte> from) => Write(from.Span);
 
+        public void Write(Span<byte> from)
+        {
+            _memory.Write(from);
+            _length += from.Length;
+        }
+
+        public override void Write(byte[] buffer, int offset, int count) => Write(new Span<byte>(buffer, offset, count));
+
+
+        public int WriteFrom(Stream from, int length)
+        {
+            int written = _memory.WriteFrom(from, length);
+            _length += written;
+            return written;
+        }
 
         public override int ReadByte() => throw new NotSupportedException();
 
         public override int Read(byte[] buffer, int offset, int count) => _memory.Read(new Memory<byte>(buffer, offset, count));
+
+        public int Read(in Span<byte> buffer) => _memory.Read(buffer);
+
+        public void CopyInto(Stream stream) => _memory.CopyTo(stream);
 
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
@@ -52,11 +89,11 @@ namespace Codestellation.SolarWind.Internals
 
         protected override void Dispose(bool disposing)
         {
-            _length = 0;
-            _memory = null;
-            Pool.Return(this);
         }
 
-        public void Complete() => _memory.Complete();
+
+        public void CompleteWrite() => _memory.CompleteWrite();
+
+        public void CompleteRead() => _memory.CompleteRead();
     }
 }

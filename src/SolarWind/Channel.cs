@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -9,22 +8,17 @@ namespace Codestellation.SolarWind
     public class Channel : IDisposable
     {
         private Connection _connection;
-        private readonly SolarWindHubOptions _options;
+        internal readonly SolarWindHubOptions Options;
 
         private Task _reader;
         private Task _writer;
-        private readonly MemoryStream _writeBuffer;
-        private readonly MemoryStream _readBuffer;
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
 
         public Channel(SolarWindHubOptions options)
         {
-            _options = options;
-            _session = new Session();
-
-            _writeBuffer = new MemoryStream(1024);
-            _readBuffer = new MemoryStream(1024);
+            Options = options;
+            _session = new Session(this);
         }
 
         public void OnReconnect(Connection connection)
@@ -36,7 +30,16 @@ namespace Codestellation.SolarWind
             _writer = StartWritingTask();
         }
 
-        public MessageId Post(Message message) => _session.Enqueue(message);
+        public MessageId Post(MessageTypeId typeId, object data)
+        {
+            //TODO: Serialize async using a serialization queue at session level
+            PooledMemoryStream payload = PooledMemoryStream.Rent();
+
+            Options.Serializer.Serialize(data, payload);
+            payload.CompleteWrite();
+
+            return _session.EnqueueOutgoing(typeId, payload);
+        }
 
         private Task StartReadingTask() => Task.Run(() =>
         {
@@ -50,24 +53,27 @@ namespace Codestellation.SolarWind
 
         private void Receive()
         {
-            if (!Receive(Header.Size))
+            PooledMemoryStream buffer = PooledMemoryStream.Rent();
+            if (!Receive(buffer, WireHeader.Size))
             {
                 return;
             }
 
-            Header header = Header.ReadFrom(_readBuffer.GetBuffer());
+            WireHeader wireHeader = WireHeader.ReadFrom(buffer);
+            buffer.CompleteRead();
+            buffer.Reset();
 
-            if (!Receive(header.PayloadSize.Value))
+            if (!Receive(buffer, wireHeader.PayloadSize.Value))
             {
                 return;
             }
 
-            object payload = _options.Serializer.Deserialize(header.MessageTypeId, _connection.Stream);
-            var message = new Message(header.MessageTypeId, payload);
-            _options.Callback(this, message);
+            var message = new Message(wireHeader.MessageHeader, buffer);
+
+            _session.EnqueueIncoming(message);
         }
 
-        private bool Receive(int count) => _connection.Receive(_readBuffer, count, _cancellationSource.Token);
+        private bool Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
 
         private async Task StartWritingTask()
         {
@@ -76,19 +82,16 @@ namespace Codestellation.SolarWind
             {
                 while (!_cancellationSource.IsCancellationRequested)
                 {
-                    //TODO: Make a synchronous path for cases where message is already available without usage of ValueTask (it's a huge structure)
-
                     try
                     {
-                        if (!_session.TryDequeueSync(out MessageId messageId, out Message message))
+                        if (!_session.TryDequeueSync(out Message message))
                         {
-                            (messageId, message) = await _session
+                            message = await _session
                                 .DequeueAsync(cancellation)
                                 .ConfigureAwait(false);
                         }
 
-                        _options.Serializer.SerializeMessage(_writeBuffer, in message, messageId);
-                        _connection.Write(_writeBuffer.GetBuffer(), 0, (int)_writeBuffer.Position);
+                        _connection.Write(message);
                     }
                     catch (OperationCanceledException)
                     {
@@ -108,7 +111,7 @@ namespace Codestellation.SolarWind
             }
 
             _cancellationSource.Cancel();
-            //writer must be stopped before reader because reader is responsible for closing socket.  
+            //writer must be stopped before stopping reader because reader is responsible for closing socket.  
             _writer.Wait();
             _reader.Wait();
         }

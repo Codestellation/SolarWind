@@ -7,6 +7,7 @@ using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
 {
+    [TestFixture]
     public class PingPongTests
     {
         private SolarWindHubOptions _serverOptions;
@@ -56,27 +57,24 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void PingPong()
         {
-            var message = new Message(new MessageTypeId(1), new TextMessage {Text = "Hello, server!"});
-            _channelToServer.Post(message);
+            _channelToServer.Post(new MessageTypeId(1), new TextMessage {Text = "Hello, server!"});
             TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(1);
             _serverReceivedMessage.WaitOne(timeout).Should().BeTrue("server is expected to receive the request");
             _clientReceivedMessage.WaitOne(timeout).Should().BeTrue("client is expected to receive the response");
         }
 
-        private void OnServerCallback(Channel channel, Message message)
+        private void OnServerCallback(Channel channel, MessageHeader header, object data)
         {
             Console.WriteLine("Message from client:");
-            Console.WriteLine(JsonConvert.SerializeObject(message.Payload, Formatting.Indented));
-
-            var reply = new Message(new MessageTypeId(1), new TextMessage {Text = "Hello, client!"});
-            channel.Post(reply);
+            Console.WriteLine(JsonConvert.SerializeObject(data, Formatting.Indented));
+            channel.Post(new MessageTypeId(1), new TextMessage {Text = "Hello, client!"});
             _serverReceivedMessage.Set();
         }
 
-        private void OnClientCallback(Channel channel, Message message)
+        private void OnClientCallback(Channel channel, MessageHeader header, object data)
         {
             Console.WriteLine("Message from server:");
-            Console.WriteLine(JsonConvert.SerializeObject(message.Payload, Formatting.Indented));
+            Console.WriteLine(JsonConvert.SerializeObject(data, Formatting.Indented));
             _clientReceivedMessage.Set();
         }
     }

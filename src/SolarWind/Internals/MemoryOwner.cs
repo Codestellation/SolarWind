@@ -1,31 +1,31 @@
 using System;
 using System.Buffers;
+using System.IO;
 using System.IO.Pipelines;
+using System.Runtime.InteropServices;
 
 namespace Codestellation.SolarWind.Internals
 {
     public class MemoryOwner
     {
-        private static readonly ObjectPool<MemoryOwner> Pool = new ObjectPool<MemoryOwner>(() => new MemoryOwner(), 1024);
-
         private readonly Pipe _pipe;
 
         private PipeWriter Writer => _pipe.Writer;
         private PipeReader Reader => _pipe.Reader;
 
-        private MemoryOwner()
+        public MemoryOwner()
         {
             _pipe = new Pipe();
         }
 
-        public void Complete() => _pipe.Writer.Complete();
+        public void CompleteWrite() => Writer.Complete();
 
-        public static MemoryOwner Rent() => Pool.Rent();
+        //TODO: Consider providing an exception object
+        public void CompleteRead() => Reader.Complete();
 
-        public static void Return(MemoryOwner owner) => Pool.Return(owner);
+        public void Reset() => _pipe.Reset();
 
-
-        public void Write(byte[] buffer, int offset, int count) => WriteImpl(new ReadOnlySpan<byte>(buffer, offset, count));
+        public void Write(in ReadOnlySpan<byte> buffer) => WriteImpl(buffer);
 
         private void WriteImpl(ReadOnlySpan<byte> from)
         {
@@ -42,7 +42,37 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        public int Read(Memory<byte> to)
+        internal int WriteFrom(Stream source, int count)
+        {
+            if (count == 0)
+            {
+                return 0;
+            }
+
+            var readBytes = 0;
+            int left = count;
+            do
+            {
+                Memory<byte> to = Writer.GetMemory(1);
+                if (MemoryMarshal.TryGetArray(to, out ArraySegment<byte> buffer))
+                {
+                    int bytesToRead = Math.Min(left, buffer.Count - buffer.Offset);
+                    readBytes = source.Read(buffer.Array, buffer.Offset, bytesToRead);
+                    left -= readBytes;
+                    Writer.Advance(readBytes);
+                }
+                else
+                {
+                    ThrowMemoryIsNotAnArray();
+                }
+            } while (left > 0 && readBytes > 0);
+
+            return count - left;
+        }
+
+        public int Read(Memory<byte> to) => Read(to.Span);
+
+        public int Read(Span<byte> to)
         {
             if (to.IsEmpty)
             {
@@ -54,7 +84,7 @@ namespace Codestellation.SolarWind.Internals
                 return 0;
             }
 
-            return ConsumeBytes(from, to.Span);
+            return ConsumeBytes(from, to);
         }
 
         private int ConsumeBytes(ReadResult from, Span<byte> to)
@@ -92,5 +122,37 @@ namespace Codestellation.SolarWind.Internals
 
             return bytesRead;
         }
+
+        public void CopyTo(Stream stream)
+        {
+            if (!Reader.TryRead(out ReadResult from))
+            {
+                return;
+            }
+
+
+            var bytesRead = 0;
+            if (!from.IsCanceled)
+            {
+                ReadOnlySequence<byte> buffer = from.Buffer;
+
+                foreach (ReadOnlyMemory<byte> segment in buffer)
+                {
+                    if (!MemoryMarshal.TryGetArray(segment, out ArraySegment<byte> array))
+                    {
+                        ThrowMemoryIsNotAnArray();
+                    }
+
+                    stream.Write(array.Array, array.Offset, array.Count);
+                    bytesRead += array.Count;
+
+                    //Free buffers asap
+                    SequencePosition end = buffer.GetPosition(bytesRead);
+                    Reader.AdvanceTo(end);
+                }
+            }
+        }
+
+        private static void ThrowMemoryIsNotAnArray() => throw new NotSupportedException("Memory pools with non-array based memory are not supported currently.");
     }
 }

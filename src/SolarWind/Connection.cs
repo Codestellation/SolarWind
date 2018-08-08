@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -6,6 +7,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Misc;
 
 namespace Codestellation.SolarWind
@@ -31,19 +33,15 @@ namespace Codestellation.SolarWind
             Stream = (Stream)sslStream ?? _networkStream;
         }
 
-        public bool Receive(MemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
+        public bool Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            if (readBuffer.Capacity < bytesToReceive)
-            {
-                readBuffer.Capacity = bytesToReceive;
-            }
-
+            int left = bytesToReceive;
             do
             {
                 //TODO: Anylyze how socket error works. 
                 if (cancellation.IsCancellationRequested || _socket.Poll(100_000, SelectMode.SelectError))
                 {
-                    //TODO: Find a better way to 
+                    //TODO: Find a better way to stop receiving
                     return false;
                 }
 
@@ -52,22 +50,28 @@ namespace Codestellation.SolarWind
                     continue;
                 }
 
-                byte[] buffer = readBuffer.GetBuffer();
+                left -= readBuffer.WriteFrom(Stream, left);
+            } while (left != 0);
 
-                var position = (int)readBuffer.Position;
-                int count = bytesToReceive - position;
+            readBuffer.CompleteWrite();
 
-                readBuffer.Position += Stream.Read(buffer, position, count);
-            } while (readBuffer.Position < bytesToReceive);
-
-            readBuffer.Position = 0;
-            readBuffer.SetLength(bytesToReceive);
             return true;
         }
 
         public void Close() => Stream.Close();
 
-        public void Write(byte[] buffer, int offset, int count) => Stream.Write(buffer, offset, count);
+        public void Write(in Message message)
+        {
+            var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
+
+            WireHeader.WriteTo(wireHeader, buffer);
+            Stream.Write(buffer, 0, WireHeader.Size);
+
+            ArrayPool<byte>.Shared.Return(buffer);
+
+            message.Payload.CopyInto(Stream);
+        }
 
         public static async Task<Connection> Accept(Socket socket, X509Certificate certificate = null)
         {

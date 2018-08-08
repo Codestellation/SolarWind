@@ -1,38 +1,95 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Internals;
 
 namespace Codestellation.SolarWind
 {
+    //TODO: When channel is being disposed dispose all messages in all queues to return streams to pool `
     public class Session
     {
-        private readonly Queue<(MessageId, Message)> _queue;
+        private readonly Channel _channel;
+        private readonly Queue<Message> _outgoingQueue;
         private readonly Dictionary<MessageId, Message> _sent;
 
         private MessageId _currentMessageId;
-        private TaskCompletionSource<(MessageId, Message)> _completionSource;
+        private TaskCompletionSource<Message> _completionSource;
+        private readonly Queue<Message> _incomingQueue;
+        private Task _deserializationTask;
 
-        public Session()
+        public Session(Channel channel)
         {
-            _queue = new Queue<(MessageId, Message)>();
+            _channel = channel;
+            _outgoingQueue = new Queue<Message>();
             //Keep some sent messages until ACK received to be able to resend them in case of failure
             _sent = new Dictionary<MessageId, Message>();
+            _incomingQueue = new Queue<Message>();
+            _deserializationTask = StartDeserializationTask();
         }
 
-        public MessageId Enqueue(in Message message)
+        private Task StartDeserializationTask() => Task.Run((Action)DeserializeAndCallback);
+
+        private void DeserializeAndCallback()
         {
-            lock (_queue)
+            //TODO: Handle exception to avoid exiting deserialization thread
+            while (true)
+            {
+                object data;
+                Message incoming;
+                using (incoming = DequeueIncoming())
+                {
+                    data = _channel.Options.Serializer.Deserialize(incoming.Header.TypeId, incoming.Payload);
+                }
+
+                _channel.Options.Callback(_channel, incoming.Header, data);
+            }
+        }
+
+        private Message DequeueIncoming()
+        {
+            lock (_incomingQueue)
+            {
+                if (_incomingQueue.Count == 0)
+                {
+                    Monitor.Wait(_incomingQueue);
+                }
+                else
+                {
+                    return _incomingQueue.Dequeue();
+                }
+            }
+
+            lock (_incomingQueue)
+            {
+                return _incomingQueue.Dequeue();
+            }
+        }
+
+        public void EnqueueIncoming(in Message message)
+        {
+            lock (_incomingQueue)
+            {
+                _incomingQueue.Enqueue(message);
+                Monitor.Pulse(_incomingQueue);
+            }
+        }
+
+        public MessageId EnqueueOutgoing(MessageTypeId typeId, PooledMemoryStream payload)
+        {
+            lock (_outgoingQueue)
             {
                 _currentMessageId = _currentMessageId.Next();
-
+                var header = new MessageHeader(typeId, _currentMessageId);
+                var message = new Message(header, payload);
                 if (_completionSource == null)
                 {
-                    _queue.Enqueue((_currentMessageId, message));
+                    _outgoingQueue.Enqueue(message);
                 }
                 else
                 {
                     _sent.Add(_currentMessageId, message);
-                    _completionSource.SetResult((_currentMessageId, message));
+                    _completionSource.SetResult(message);
                     _completionSource = null;
                 }
 
@@ -42,44 +99,45 @@ namespace Codestellation.SolarWind
 
         public void Ack(MessageId messageId)
         {
-            lock (_queue)
+            lock (_outgoingQueue)
             {
                 _sent.Remove(messageId);
             }
         }
 
-        public bool TryDequeueSync(out MessageId messageId, out Message message)
+        public bool TryDequeueSync(out Message message)
         {
-            if (Monitor.TryEnter(_queue))
+            if (Monitor.TryEnter(_outgoingQueue))
             {
-                if (_queue.Count > 0)
+                if (_outgoingQueue.Count > 0)
                 {
-                    (messageId, message) = _queue.Dequeue();
-                    _sent.Add(messageId, message);
+                    message = _outgoingQueue.Dequeue();
+                    _sent.Add(message.Header.MessageId, message);
                     return true;
                 }
 
-                Monitor.Exit(_queue);
+                Monitor.Exit(_outgoingQueue);
             }
 
-            messageId = default;
             message = default;
             return false;
         }
 
         //TODO: Replace with ValueTask<> with usage of IValueTaskSource (don't have to have pool, it's supposed to be used be the only reader)
-        public Task<(MessageId, Message)> DequeueAsync(CancellationToken token)
+
+        public Task<Message> DequeueAsync(CancellationToken token)
         {
-            lock (_queue)
+            //TODO: Apply token
+            lock (_outgoingQueue)
             {
-                if (_queue.Count > 0)
+                if (_outgoingQueue.Count > 0)
                 {
-                    (MessageId id, Message message) = _queue.Dequeue();
-                    _sent.Add(id, message);
-                    return Task.FromResult((id, message));
+                    Message message = _outgoingQueue.Dequeue();
+                    _sent.Add(message.Header.MessageId, message);
+                    return Task.FromResult(message);
                 }
 
-                _completionSource = new TaskCompletionSource<(MessageId, Message)>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _completionSource = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
                 return _completionSource.Task;
             }
         }

@@ -8,6 +8,7 @@ namespace Codestellation.SolarWind
     public struct MessageId : IEquatable<MessageId>
     {
         private readonly ulong _value;
+        public static MessageId Empty = default;
 
         public MessageId(ulong value)
         {

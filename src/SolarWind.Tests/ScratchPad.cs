@@ -1,6 +1,6 @@
-﻿using System.IO;
-using System.Threading;
-using Codestellation.SolarWind.Internals;
+using System;
+using System.Buffers;
+using System.IO.Pipelines;
 using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
@@ -10,7 +10,7 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void Test()
         {
-            new MemoryStream();
+            
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
@@ -29,10 +30,13 @@ namespace Codestellation.SolarWind.Tests
             _uri = new Uri("tcp://localhost:4312");
             _hub.Listen(_uri);
 
-            _message = new Message(new MessageTypeId(1), new TextMessage {Text = "Greetings"});
+
+            var header = new MessageHeader(new MessageTypeId(1), MessageId.Empty);
+            var data = new TextMessage {Text = "Greetings"};
+
             _messageBuffer = new MemoryStream();
 
-            options.Serializer.SerializeMessage(_messageBuffer, in _message, default);
+            options.Serializer.SerializeMessage(_messageBuffer, in header, data);
 
             _clientHubId = new HubId("client");
         }
@@ -101,19 +105,32 @@ namespace Codestellation.SolarWind.Tests
 
         private static void AssertReceived(TcpClient client)
         {
+            var expectedBytes = 87;
+            int left = expectedBytes;
             var buffer = new byte[512];
-            int received = client.Client.Receive(buffer);
+            var received = 0;
+            do
+            {
+                left -= client.GetStream().Read(buffer, 0, 84);
+                received = expectedBytes - left;
+            } while (left != 0);
+
             received.Should().BeGreaterOrEqualTo(84);
             Console.WriteLine(received);
             Console.WriteLine(BitConverter.ToString(buffer, 0, received));
         }
 
 
-        private void OnCallback(Channel channel, Message message) => channel.Post(message);
+        private void OnCallback(Channel channel, MessageHeader header, object data) => channel.Post(header.TypeId, data);
 
         private TcpClient CreateClient()
         {
-            var client = new TcpClient {ReceiveTimeout = 5000};
+            var client = new TcpClient();
+            if (!Debugger.IsAttached)
+            {
+                client.ReceiveTimeout = 5000;
+            }
+
             client.Connect(_uri.Host, _uri.Port);
             client.GetStream().SendHandshake(_clientHubId);
             HandshakeMessage _ = client.GetStream().ReceiveHandshake().Result;

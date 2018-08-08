@@ -1,4 +1,4 @@
 namespace Codestellation.SolarWind
 {
-    public delegate void SolarWindCallback(Channel channel, Message message);
+    public delegate void SolarWindCallback(Channel channel, MessageHeader header, object data);
 }
