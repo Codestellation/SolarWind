@@ -7,7 +7,7 @@ using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind
 {
-    //TODO: When channel is being disposed dispose all messages in all queues to return streams to pool `
+    //TODO: When channel is being disposed dispose all messages in all queues to return streams to pool
     public class Session : IDisposable
     {
         private readonly Channel _channel;
@@ -16,19 +16,51 @@ namespace Codestellation.SolarWind
 
         private MessageId _currentMessageId;
         private readonly AwaitableQueue<Message> _incomingQueue;
-        private readonly Task _deserialization;
+
         private readonly CancellationTokenSource _disposal;
+        private readonly AwaitableQueue<(MessageHeader, object data)> _serializationQueue;
+
+        private readonly Task _serialization;
+        private readonly Task _deserialization;
 
         public Session(Channel channel)
         {
             _channel = channel;
+            _serializationQueue = new AwaitableQueue<(MessageHeader, object data)>();
             _outgoingQueue = new AwaitableQueue<Message>();
             _incomingQueue = new AwaitableQueue<Message>();
             _disposal = new CancellationTokenSource();
 
             //Keep some sent messages until ACK received to be able to resend them in case of failure
             _sent = new Dictionary<MessageId, Message>();
+
+            _serialization = StartSerializationTask();
             _deserialization = StartDeserializationTask();
+        }
+
+        private async Task StartSerializationTask()
+        {
+            while (!_disposal.IsCancellationRequested)
+            {
+                (MessageHeader header, object data) = await _serializationQueue.Await(_disposal.Token).ConfigureAwait(false);
+                PooledMemoryStream payload = PooledMemoryStream.Rent();
+                try
+                {
+                    _channel.Options.Serializer.Serialize(data, payload);
+                    payload.CompleteWrite();
+                    var message = new Message(header, payload);
+                    _outgoingQueue.Enqueue(message);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception e)
+                {
+                    //TODO: Better logging
+                    Console.WriteLine(e);
+                }
+            }
         }
 
         private async Task StartDeserializationTask()
@@ -50,7 +82,7 @@ namespace Codestellation.SolarWind
                 }
                 catch (Exception e)
                 {
-                    //Use better logging
+                    //TODO: Use better logging
                     Console.WriteLine(e);
                 }
             }
@@ -59,7 +91,7 @@ namespace Codestellation.SolarWind
 
         public void EnqueueIncoming(in Message message) => _incomingQueue.Enqueue(message);
 
-        public MessageId EnqueueOutgoing(MessageTypeId typeId, PooledMemoryStream payload)
+        public MessageId EnqueueOutgoing(MessageTypeId typeId, object data)
         {
             MessageId id;
             lock (_outgoingQueue)
@@ -68,15 +100,13 @@ namespace Codestellation.SolarWind
             }
 
             var header = new MessageHeader(typeId, id);
-            var message = new Message(header, payload);
-            _outgoingQueue.Enqueue(message);
-
+            _serializationQueue.Enqueue((header, data));
             return id;
         }
 
         public void Ack(MessageId messageId)
         {
-            lock (_outgoingQueue)
+            lock (_sent)
             {
                 if (_sent.TryGetValue(messageId, out Message message))
                 {

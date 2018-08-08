@@ -30,16 +30,7 @@ namespace Codestellation.SolarWind
             _writer = StartWritingTask();
         }
 
-        public MessageId Post(MessageTypeId typeId, object data)
-        {
-            //TODO: Serialize async using a serialization queue at session level
-            PooledMemoryStream payload = PooledMemoryStream.Rent();
-
-            Options.Serializer.Serialize(data, payload);
-            payload.CompleteWrite();
-
-            return _session.EnqueueOutgoing(typeId, payload);
-        }
+        public MessageId Post(MessageTypeId typeId, object data) => _session.EnqueueOutgoing(typeId, data);
 
         private Task StartReadingTask() => Task.Run(() =>
         {
