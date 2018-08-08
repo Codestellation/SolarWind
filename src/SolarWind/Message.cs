@@ -10,9 +10,13 @@ namespace Codestellation.SolarWind
 
         public Message(MessageHeader header, PooledMemoryStream payload)
         {
-            Header = header;
-            Payload = payload;
+            Header = header.IsEmpty
+                ? throw new ArgumentException("Must not be a default value", nameof(header))
+                : header;
+            Payload = payload ?? throw new ArgumentNullException(nameof(payload));
         }
+
+        public bool IsEmpty => this.Equals(default);
 
         public void Dispose()
         {

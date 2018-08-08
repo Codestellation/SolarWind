@@ -56,6 +56,7 @@ namespace Codestellation.SolarWind
             PooledMemoryStream buffer = PooledMemoryStream.Rent();
             if (!Receive(buffer, WireHeader.Size))
             {
+                PooledMemoryStream.ResetAndReturn(buffer);
                 return;
             }
 
@@ -65,6 +66,7 @@ namespace Codestellation.SolarWind
 
             if (!Receive(buffer, wireHeader.PayloadSize.Value))
             {
+                PooledMemoryStream.ResetAndReturn(buffer);
                 return;
             }
 
@@ -77,28 +79,24 @@ namespace Codestellation.SolarWind
 
         private async Task StartWritingTask()
         {
-            CancellationToken cancellation = _cancellationSource.Token;
-            using (cancellation.Register(() => _session.Cancel()))
+            while (!_cancellationSource.IsCancellationRequested)
             {
-                while (!_cancellationSource.IsCancellationRequested)
+                try
                 {
-                    try
-                    {
-                        if (!_session.TryDequeueSync(out Message message))
-                        {
-                            message = await _session
-                                .DequeueAsync(cancellation)
-                                .ConfigureAwait(false);
-                        }
+                    //TODO: Consider sync way to get result
+                    Message message = await _session
+                        .DequeueAsync(_cancellationSource.Token)
+                        .ConfigureAwait(false);
 
-                        _connection.Write(message);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return;
-                    }
+                    _connection.Write(message);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
                 }
             }
+
+            //_writerFinished.Set();
         }
 
         public void Dispose() => Stop();

@@ -3,41 +3,44 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
+using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind
 {
     //TODO: When channel is being disposed dispose all messages in all queues to return streams to pool `
-    public class Session
+    public class Session : IDisposable
     {
         private readonly Channel _channel;
-        private readonly Queue<Message> _outgoingQueue;
+        private readonly AwaitableQueue<Message> _outgoingQueue;
         private readonly Dictionary<MessageId, Message> _sent;
 
         private MessageId _currentMessageId;
-        private TaskCompletionSource<Message> _completionSource;
-        private readonly Queue<Message> _incomingQueue;
-        private Task _deserializationTask;
+        private readonly AwaitableQueue<Message> _incomingQueue;
+        private readonly Task _deserializationTask;
 
         public Session(Channel channel)
         {
             _channel = channel;
-            _outgoingQueue = new Queue<Message>();
+            _outgoingQueue = new AwaitableQueue<Message>();
+            _incomingQueue = new AwaitableQueue<Message>();
+
             //Keep some sent messages until ACK received to be able to resend them in case of failure
             _sent = new Dictionary<MessageId, Message>();
-            _incomingQueue = new Queue<Message>();
+
             _deserializationTask = StartDeserializationTask();
         }
 
         private Task StartDeserializationTask() => Task.Run((Action)DeserializeAndCallback);
 
-        private void DeserializeAndCallback()
+        private async void DeserializeAndCallback()
         {
             //TODO: Handle exception to avoid exiting deserialization thread
+            //TODO: Implement graceful shutdown
             while (true)
             {
                 object data;
                 Message incoming;
-                using (incoming = DequeueIncoming())
+                using (incoming = await _incomingQueue.Await(CancellationToken.None).ConfigureAwait(false))
                 {
                     data = _channel.Options.Serializer.Deserialize(incoming.Header.TypeId, incoming.Payload);
                 }
@@ -46,25 +49,6 @@ namespace Codestellation.SolarWind
             }
         }
 
-        private Message DequeueIncoming()
-        {
-            lock (_incomingQueue)
-            {
-                if (_incomingQueue.Count == 0)
-                {
-                    Monitor.Wait(_incomingQueue);
-                }
-                else
-                {
-                    return _incomingQueue.Dequeue();
-                }
-            }
-
-            lock (_incomingQueue)
-            {
-                return _incomingQueue.Dequeue();
-            }
-        }
 
         public void EnqueueIncoming(in Message message)
         {
@@ -77,71 +61,53 @@ namespace Codestellation.SolarWind
 
         public MessageId EnqueueOutgoing(MessageTypeId typeId, PooledMemoryStream payload)
         {
+            MessageId id;
             lock (_outgoingQueue)
             {
-                _currentMessageId = _currentMessageId.Next();
-                var header = new MessageHeader(typeId, _currentMessageId);
-                var message = new Message(header, payload);
-                if (_completionSource == null)
-                {
-                    _outgoingQueue.Enqueue(message);
-                }
-                else
-                {
-                    _sent.Add(_currentMessageId, message);
-                    _completionSource.SetResult(message);
-                    _completionSource = null;
-                }
-
-                return _currentMessageId;
+                id = _currentMessageId = _currentMessageId.Next();
             }
+
+            var header = new MessageHeader(typeId, id);
+            var message = new Message(header, payload);
+            _outgoingQueue.Enqueue(message);
+
+            return id;
         }
 
         public void Ack(MessageId messageId)
         {
             lock (_outgoingQueue)
             {
-                _sent.Remove(messageId);
-            }
-        }
-
-        public bool TryDequeueSync(out Message message)
-        {
-            if (Monitor.TryEnter(_outgoingQueue))
-            {
-                if (_outgoingQueue.Count > 0)
+                if (_sent.TryGetValue(messageId, out Message message))
                 {
-                    message = _outgoingQueue.Dequeue();
-                    _sent.Add(message.Header.MessageId, message);
-                    return true;
+                    message.Dispose();
+                    _sent.Remove(messageId);
                 }
-
-                Monitor.Exit(_outgoingQueue);
             }
-
-            message = default;
-            return false;
         }
 
-        //TODO: Replace with ValueTask<> with usage of IValueTaskSource (don't have to have pool, it's supposed to be used be the only reader)
-
-        public Task<Message> DequeueAsync(CancellationToken token)
+        public async ValueTask<Message> DequeueAsync(CancellationToken cancellation)
         {
-            //TODO: Apply token
-            lock (_outgoingQueue)
+            Message result = await _outgoingQueue.Await(cancellation);
+            lock (_sent)
             {
-                if (_outgoingQueue.Count > 0)
-                {
-                    Message message = _outgoingQueue.Dequeue();
-                    _sent.Add(message.Header.MessageId, message);
-                    return Task.FromResult(message);
-                }
-
-                _completionSource = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
-                return _completionSource.Task;
+                _sent.Add(result.Header.MessageId, result);
             }
+
+            return result;
         }
 
-        public void Cancel() => Volatile.Read(ref _completionSource)?.TrySetCanceled();
+        //public void Cancel() => Volatile.Read(ref _completionSource)?.TrySetCanceled();
+        public void Cancel()
+        {
+        }
+
+        public void Dispose()
+        {
+            //TODO: Dispose messages in queues.
+
+            _channel?.Dispose();
+            _deserializationTask?.Dispose();
+        }
     }
 }
