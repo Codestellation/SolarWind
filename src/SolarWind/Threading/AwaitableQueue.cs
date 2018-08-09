@@ -34,7 +34,7 @@ namespace Codestellation.SolarWind.Threading
         {
             lock (_queue)
             {
-                return _queue.Count == 0 ? _source.Await(cancellation) : new ValueTask<T>(_queue.Dequeue());
+                return _queue.Count == 0 ? _source.AwaitValue(cancellation) : new ValueTask<T>(_queue.Dequeue());
             }
         }
     }

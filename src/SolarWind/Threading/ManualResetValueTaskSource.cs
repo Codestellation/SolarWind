@@ -39,9 +39,25 @@ namespace Codestellation.SolarWind.Threading
 
         public short Version => _logic.Version;
 
-        public void SetResult(in T result) => _logic.SetResult(result);
+        public void SetResult(in T result)
+        {
+            //If monitor is entered by someone else - we are late, so simply drop results
+            if (Monitor.TryEnter(_cancellationCallback))
+            {
+                _logic.SetResult(result);
+                Monitor.Exit(_cancellationCallback);
+            }
+        }
 
-        public void SetException(Exception error) => _logic.SetException(error);
+        public void SetException(Exception error)
+        {
+            //If monitor is entered by someone else - we are late, so simply drop results
+            if (Monitor.TryEnter(_cancellationCallback))
+            {
+                _logic.SetException(error);
+                Monitor.Exit(_cancellationCallback);
+            }
+        }
 
         public void SetCanceled() => SetException(new TaskCanceledException());
 
@@ -57,12 +73,20 @@ namespace Codestellation.SolarWind.Threading
 
         public bool IsBeingAwaited => _logic.IsBeingAwaited;
 
-        public ValueTask<T> Await(CancellationToken cancellation)
+        public ValueTask<T> AwaitValue(CancellationToken cancellation)
         {
             CancellationTokenRegistration? registration = cancellation == CancellationToken.None
                 ? (CancellationTokenRegistration?)null
                 : cancellation.Register(_cancellationCallback);
-            return _logic.Await(this, registration);
+            return _logic.AwaitValue(this, registration);
+        }
+
+        public ValueTask AwaitVoid(CancellationToken cancellation)
+        {
+            CancellationTokenRegistration? registration = cancellation == CancellationToken.None
+                ? (CancellationTokenRegistration?)null
+                : cancellation.Register(_cancellationCallback);
+            return _logic.AwaitVoid(this, registration);
         }
     }
 
@@ -275,11 +299,18 @@ namespace Codestellation.SolarWind.Threading
             }
         }
 
-        public ValueTask<T> Await<T>(AutoResetValueTaskSource<T> source, CancellationTokenRegistration? registration)
+        public ValueTask<T> AwaitValue<T>(IValueTaskSource<T> source, CancellationTokenRegistration? registration)
         {
             _isBeingAwaited = true;
             _registration = registration;
             return new ValueTask<T>(source, _version);
+        }
+
+        public ValueTask AwaitVoid(IValueTaskSource source, CancellationTokenRegistration? registration)
+        {
+            _isBeingAwaited = true;
+            _registration = registration;
+            return new ValueTask(source, _version);
         }
     }
 }

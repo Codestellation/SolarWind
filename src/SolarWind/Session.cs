@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -12,7 +11,6 @@ namespace Codestellation.SolarWind
     {
         private readonly Channel _channel;
         private readonly AwaitableQueue<Message> _outgoingQueue;
-        private readonly Dictionary<MessageId, Message> _sent;
 
         private MessageId _currentMessageId;
         private readonly AwaitableQueue<Message> _incomingQueue;
@@ -30,9 +28,6 @@ namespace Codestellation.SolarWind
             _outgoingQueue = new AwaitableQueue<Message>();
             _incomingQueue = new AwaitableQueue<Message>();
             _disposal = new CancellationTokenSource();
-
-            //Keep some sent messages until ACK received to be able to resend them in case of failure
-            _sent = new Dictionary<MessageId, Message>();
 
             _serialization = StartSerializationTask();
             _deserialization = StartDeserializationTask();
@@ -104,28 +99,7 @@ namespace Codestellation.SolarWind
             return id;
         }
 
-        public void Ack(MessageId messageId)
-        {
-            lock (_sent)
-            {
-                if (_sent.TryGetValue(messageId, out Message message))
-                {
-                    message.Dispose();
-                    _sent.Remove(messageId);
-                }
-            }
-        }
-
-        public async ValueTask<Message> DequeueAsync(CancellationToken cancellation)
-        {
-            Message result = await _outgoingQueue.Await(cancellation);
-            lock (_sent)
-            {
-                _sent.Add(result.Header.MessageId, result);
-            }
-
-            return result;
-        }
+        public ValueTask<Message> DequeueAsync(CancellationToken cancellation) => _outgoingQueue.Await(cancellation);
 
         public void Dispose()
         {

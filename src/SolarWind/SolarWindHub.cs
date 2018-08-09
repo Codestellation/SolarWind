@@ -11,12 +11,15 @@ namespace Codestellation.SolarWind
         private readonly ConcurrentDictionary<ChannelId, Channel> _channels;
         private bool _disposed;
         private readonly Listener _listener;
+        private readonly Poller _poller;
 
         public SolarWindHub(SolarWindHubOptions options)
         {
             _options = options.Clone();
             _channels = new ConcurrentDictionary<ChannelId, Channel>();
             _listener = new Listener(_options, (hubId, connection) => OnChannelAccepted(hubId, connection));
+
+            _poller = new Poller(_channels);
         }
 
         public void Listen(Uri uri) => _listener.Listen(uri);
@@ -41,6 +44,7 @@ namespace Codestellation.SolarWind
 
             Parallel.ForEach(_channels, c => c.Value.Dispose());
             _listener.Dispose();
+            _poller.Dispose();
         }
 
         private Channel OnChannelAccepted(HubId remoteHubId, Connection connection)

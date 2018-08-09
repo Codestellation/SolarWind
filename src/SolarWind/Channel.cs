@@ -15,6 +15,8 @@ namespace Codestellation.SolarWind
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
 
+        internal Connection Connection => _connection;
+
         public Channel(SolarWindHubOptions options)
         {
             Options = options;
@@ -32,41 +34,47 @@ namespace Codestellation.SolarWind
 
         public MessageId Post(MessageTypeId typeId, object data) => _session.EnqueueOutgoing(typeId, data);
 
-        private Task StartReadingTask() => Task.Run(() =>
+        private async Task StartReadingTask()
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
-                Receive();
+                await Receive().ConfigureAwait(false);
             }
 
             _connection.Close();
-        });
+        }
 
-        private void Receive()
+        private async ValueTask Receive()
         {
+            //TODO: Error handling routines
             PooledMemoryStream buffer = PooledMemoryStream.Rent();
-            if (!Receive(buffer, WireHeader.Size))
+            Message message;
+            try
             {
+                await Receive(buffer, WireHeader.Size).ConfigureAwait(false);
+
+                WireHeader wireHeader = WireHeader.ReadFrom(buffer);
+                buffer.CompleteRead();
+                buffer.Reset();
+
+                await Receive(buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
+                message = new Message(wireHeader.MessageHeader, buffer);
+            }
+            catch (Exception e)
+            {
+                if (!(e is OperationCanceledException))
+                {
+                    Console.WriteLine(e);
+                }
+
                 PooledMemoryStream.ResetAndReturn(buffer);
                 return;
             }
-
-            WireHeader wireHeader = WireHeader.ReadFrom(buffer);
-            buffer.CompleteRead();
-            buffer.Reset();
-
-            if (!Receive(buffer, wireHeader.PayloadSize.Value))
-            {
-                PooledMemoryStream.ResetAndReturn(buffer);
-                return;
-            }
-
-            var message = new Message(wireHeader.MessageHeader, buffer);
 
             _session.EnqueueIncoming(message);
         }
 
-        private bool Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
+        private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
 
         private async Task StartWritingTask()
         {
@@ -79,7 +87,10 @@ namespace Codestellation.SolarWind
                         .DequeueAsync(_cancellationSource.Token)
                         .ConfigureAwait(false);
 
-                    _connection.Write(message);
+                    using (message)
+                    {
+                        _connection.Write(message);
+                    }
                 }
                 catch (OperationCanceledException)
                 {

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Misc;
+using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind
 {
@@ -17,6 +18,7 @@ namespace Codestellation.SolarWind
         private readonly Socket _socket;
         private readonly NetworkStream _networkStream;
         private readonly SslStream _sslStream;
+        private readonly AutoResetValueTaskSource<int> _receivedSource;
 
         /// <summary>
         /// Could be either <see cref="NetworkStream" /> or <see cref="SslStream" />
@@ -31,32 +33,49 @@ namespace Codestellation.SolarWind
             _networkStream = networkStream;
             _sslStream = sslStream;
             Stream = (Stream)sslStream ?? _networkStream;
+            //int is a simply stub case the class implements both IValueTaskSource and IValueTaskSource<T>
+            _receivedSource = new AutoResetValueTaskSource<int>();
         }
 
-        public bool Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
+        public async ValueTask Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
             int left = bytesToReceive;
-            do
+
+            while (left != 0)
             {
-                //TODO: Anylyze how socket error works. 
-                if (cancellation.IsCancellationRequested || _socket.Poll(100_000, SelectMode.SelectError))
+                if (cancellation.IsCancellationRequested)
                 {
-                    //TODO: Find a better way to stop receiving
-                    return false;
+                    throw new TaskCanceledException();
                 }
 
-                if (!_socket.Poll(100_000, SelectMode.SelectRead))
+                if (_socket.Available > 0)
                 {
+                    left -= readBuffer.WriteFrom(Stream, left);
                     continue;
                 }
 
-                left -= readBuffer.WriteFrom(Stream, left);
-            } while (left != 0);
+                await AwailableData(cancellation).ConfigureAwait(false);
+            }
 
             readBuffer.CompleteWrite();
-
-            return true;
         }
+
+        private ValueTask AwailableData(CancellationToken cancellation) => _receivedSource.AwaitVoid(cancellation);
+
+        internal bool TryGetSocket(out Socket socket)
+        {
+            if (_receivedSource.IsBeingAwaited)
+            {
+                socket = _socket;
+                return true;
+            }
+
+
+            socket = null;
+            return false;
+        }
+
+        public void NotifyReady() => _receivedSource.SetResult(0);
 
         public void Close() => Stream.Close();
 
