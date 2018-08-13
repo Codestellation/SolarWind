@@ -23,6 +23,20 @@ namespace System.Runtime.CompilerServices
 
 namespace Codestellation.SolarWind.Threading
 {
+    public enum ContinuationOptions
+    {
+        /// <summary>
+        /// Default behaviour depending on context it could be the thread initiated continuation, a thread pool thread, a current or default TaskScheduler
+        /// </summary>
+        None,
+
+        /// <summary>
+        /// Use thread pool to schedule
+        /// </summary>
+        ForceThreadPool
+    }
+
+
     /// <summary>
     ///     <remarks>This class must be used with an instance per awaiter. So if it's expected to have multiple awaiters simultaneously - use object pool or create new instances</remarks>
     /// </summary>
