@@ -23,6 +23,20 @@ namespace System.Runtime.CompilerServices
 
 namespace Codestellation.SolarWind.Threading
 {
+    public enum ContinuationOptions
+    {
+        /// <summary>
+        /// Default behaviour depending on context it could be the thread initiated continuation, a thread pool thread, a current or default TaskScheduler
+        /// </summary>
+        None,
+
+        /// <summary>
+        /// Use default task scheduler
+        /// </summary>
+        ForceDefaultTaskScheduler
+    }
+
+
     /// <summary>
     ///     <remarks>This class must be used with an instance per awaiter. So if it's expected to have multiple awaiters simultaneously - use object pool or create new instances</remarks>
     /// </summary>
@@ -31,9 +45,9 @@ namespace Codestellation.SolarWind.Threading
         private AutoResetValueTaskSourceLogic<T> _logic; // mutable struct; do not make this readonly
         private readonly Action _cancellationCallback;
 
-        public AutoResetValueTaskSource()
+        public AutoResetValueTaskSource(ContinuationOptions options = ContinuationOptions.None)
         {
-            _logic = new AutoResetValueTaskSourceLogic<T>(this);
+            _logic = new AutoResetValueTaskSourceLogic<T>(this, options);
             _cancellationCallback = SetCanceled;
         }
 
@@ -95,6 +109,7 @@ namespace Codestellation.SolarWind.Threading
         private static readonly Action<object> s_sentinel = s => throw new InvalidOperationException();
 
         private readonly IStrongBox<AutoResetValueTaskSourceLogic<TResult>> _parent;
+        private readonly ContinuationOptions _options;
         private Action<object> _continuation;
         private object _continuationState;
         private object _capturedContext;
@@ -102,13 +117,12 @@ namespace Codestellation.SolarWind.Threading
         private bool _completed;
         private TResult _result;
         private ExceptionDispatchInfo _error;
-        private short _version;
-        private bool _isBeingAwaited;
         private CancellationTokenRegistration? _registration;
 
-        public AutoResetValueTaskSourceLogic(IStrongBox<AutoResetValueTaskSourceLogic<TResult>> parent)
+        public AutoResetValueTaskSourceLogic(IStrongBox<AutoResetValueTaskSourceLogic<TResult>> parent, ContinuationOptions options)
         {
             _parent = parent ?? throw new ArgumentNullException(nameof(parent));
+            _options = options;
             _continuation = null;
             _continuationState = null;
             _capturedContext = null;
@@ -116,17 +130,18 @@ namespace Codestellation.SolarWind.Threading
             _completed = false;
             _result = default;
             _error = null;
-            _version = 0;
-            _isBeingAwaited = false;
+            Version = 0;
+            IsBeingAwaited = false;
             _registration = null;
         }
 
-        public short Version => _version;
-        public bool IsBeingAwaited => _isBeingAwaited;
+        public short Version { get; private set; }
+
+        public bool IsBeingAwaited { get; private set; }
 
         private void ValidateToken(short token)
         {
-            if (token != _version)
+            if (token != Version)
             {
                 throw new InvalidOperationException();
             }
@@ -162,7 +177,7 @@ namespace Codestellation.SolarWind.Threading
 
         private void Reset()
         {
-            _version++;
+            Version++;
 
             _registration?.Dispose();
 
@@ -173,7 +188,7 @@ namespace Codestellation.SolarWind.Threading
             _error = null;
             _executionContext = null;
             _capturedContext = null;
-            _isBeingAwaited = false;
+            IsBeingAwaited = false;
             _registration = null;
         }
 
@@ -185,6 +200,7 @@ namespace Codestellation.SolarWind.Threading
             }
 
             ValidateToken(token);
+
 
             if ((flags & ValueTaskSourceOnCompletedFlags.FlowExecutionContext) != 0)
             {
@@ -279,6 +295,11 @@ namespace Codestellation.SolarWind.Threading
             object cc = _capturedContext;
             _capturedContext = null;
 
+            if (_options == ContinuationOptions.ForceDefaultTaskScheduler)
+            {
+                cc = TaskScheduler.Default;
+            }
+
             switch (cc)
             {
                 case null:
@@ -301,16 +322,16 @@ namespace Codestellation.SolarWind.Threading
 
         public ValueTask<T> AwaitValue<T>(IValueTaskSource<T> source, CancellationTokenRegistration? registration)
         {
-            _isBeingAwaited = true;
+            IsBeingAwaited = true;
             _registration = registration;
-            return new ValueTask<T>(source, _version);
+            return new ValueTask<T>(source, Version);
         }
 
         public ValueTask AwaitVoid(IValueTaskSource source, CancellationTokenRegistration? registration)
         {
-            _isBeingAwaited = true;
+            IsBeingAwaited = true;
             _registration = registration;
-            return new ValueTask(source, _version);
+            return new ValueTask(source, Version);
         }
     }
 }

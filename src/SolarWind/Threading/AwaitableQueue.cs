@@ -9,10 +9,10 @@ namespace Codestellation.SolarWind.Threading
         private readonly Queue<T> _queue;
         private readonly AutoResetValueTaskSource<T> _source;
 
-        public AwaitableQueue()
+        public AwaitableQueue(ContinuationOptions options = ContinuationOptions.None)
         {
             _queue = new Queue<T>();
-            _source = new AutoResetValueTaskSource<T>();
+            _source = new AutoResetValueTaskSource<T>(options);
         }
 
         public void Enqueue(in T value)
