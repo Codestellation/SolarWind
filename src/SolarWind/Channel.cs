@@ -44,7 +44,7 @@ namespace Codestellation.SolarWind
             _connection.Close();
         }
 
-        private async ValueTask Receive()
+        private async Task Receive()
         {
             //TODO: Error handling routines
             PooledMemoryStream buffer = PooledMemoryStream.Rent();
@@ -74,7 +74,7 @@ namespace Codestellation.SolarWind
             _session.EnqueueIncoming(message);
         }
 
-        private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
+        private Task Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
 
         private async Task StartWritingTask()
         {
@@ -89,7 +89,9 @@ namespace Codestellation.SolarWind
 
                     using (message)
                     {
-                        _connection.Write(message);
+                        await Connection
+                            .WriteAsync(message, _cancellationSource.Token)
+                            .ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException)

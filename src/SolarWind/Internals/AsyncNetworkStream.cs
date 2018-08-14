@@ -1,4 +1,3 @@
-using System;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,50 +47,42 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        public override Task FlushAsync(CancellationToken cancellationToken)
-        {
-            Console.WriteLine();
-            //TODO: Check out how this implemented and whether I have to override it
-
-            return base.FlushAsync(cancellationToken);
-        }
-
         //TODO: I can do it with value task but I have to clone ReadAsync method on the SslStream and use both of them. 
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellation)
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellation)
         {
-            if (Socket.Available != 0)
-            {
-                var received = Socket.Receive(buffer, offset, count, SocketFlags.None);
-                return Task.FromResult(received);
-            }
-
             _receiveArgs.SetBuffer(buffer, offset, count);
-            if (!Socket.ReceiveAsync(_receiveArgs))
+            if (Socket.ReceiveAsync(_receiveArgs))
             {
-                throw new InvalidOperationException("Handle it gracefully");
+                return await _receiveSource
+                    .AwaitValue(cancellation)
+                    .ConfigureAwait(false);
             }
 
-            return _receiveSource.AwaitValue(cancellation).AsTask();
+            return _receiveArgs.BytesTransferred;
         }
 
         public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            var left = count;
+            int left = count;
             var sent = 0;
             while (left != 0)
             {
-                var realOffset = offset + sent;
+                int realOffset = offset + sent;
 
                 _sendArgs.SetBuffer(buffer, realOffset, left);
 
-                if (!Socket.SendAsync(_sendArgs))
+                if (Socket.SendAsync(_sendArgs))
                 {
-                    throw new InvalidOperationException("Handle it gracefully");
+                    sent += await _sendSource
+                        .AwaitValue(cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    //Operation has completed synchronously
+                    sent += _sendArgs.BytesTransferred;
                 }
 
-                sent += await _sendSource
-                    .AwaitValue(cancellationToken)
-                    .ConfigureAwait(false);
                 left -= sent;
             }
         }

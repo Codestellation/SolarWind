@@ -3,6 +3,8 @@ using System.Buffers;
 using System.IO;
 using System.IO.Pipelines;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -58,6 +60,36 @@ namespace Codestellation.SolarWind.Internals
                 {
                     int bytesToRead = Math.Min(left, buffer.Count - buffer.Offset);
                     readBytes = source.Read(buffer.Array, buffer.Offset, bytesToRead);
+                    left -= readBytes;
+                    Writer.Advance(readBytes);
+                }
+                else
+                {
+                    ThrowMemoryIsNotAnArray();
+                }
+            } while (left > 0 && readBytes > 0);
+
+            return count - left;
+        }
+
+        internal async Task<int> WriteFromAsync(Stream source, int count, CancellationToken cancellation)
+        {
+            if (count == 0)
+            {
+                return 0;
+            }
+
+            var readBytes = 0;
+            int left = count;
+            do
+            {
+                Memory<byte> to = Writer.GetMemory(1);
+                if (MemoryMarshal.TryGetArray(to, out ArraySegment<byte> buffer))
+                {
+                    int bytesToRead = Math.Min(left, buffer.Count - buffer.Offset);
+                    readBytes = await source
+                        .ReadAsync(buffer.Array, buffer.Offset, bytesToRead, cancellation)
+                        .ConfigureAwait(false);
                     left -= readBytes;
                     Writer.Advance(readBytes);
                 }
@@ -144,6 +176,36 @@ namespace Codestellation.SolarWind.Internals
                     }
 
                     stream.Write(array.Array, array.Offset, array.Count);
+                    bytesRead += array.Count;
+
+                    //Free buffers asap
+                    SequencePosition end = buffer.GetPosition(bytesRead);
+                    Reader.AdvanceTo(end);
+                }
+            }
+        }
+
+        public async Task CopyToAsync(Stream stream, CancellationToken cancellation)
+        {
+            if (!Reader.TryRead(out ReadResult from))
+            {
+                return;
+            }
+
+
+            var bytesRead = 0;
+            if (!from.IsCanceled)
+            {
+                ReadOnlySequence<byte> buffer = from.Buffer;
+
+                foreach (ReadOnlyMemory<byte> segment in buffer)
+                {
+                    if (!MemoryMarshal.TryGetArray(segment, out ArraySegment<byte> array))
+                    {
+                        ThrowMemoryIsNotAnArray();
+                    }
+
+                    await stream.WriteAsync(array.Array, array.Offset, array.Count, cancellation).ConfigureAwait(false);
                     bytesRead += array.Count;
 
                     //Free buffers asap

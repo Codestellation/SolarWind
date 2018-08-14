@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -82,6 +84,15 @@ namespace Codestellation.SolarWind.Internals
             return written;
         }
 
+        public async Task<int> WriteFromAsync(Stream @from, int length, CancellationToken cancellation)
+        {
+            var written = await _memory
+                .WriteFromAsync(from, length, cancellation)
+                .ConfigureAwait(false);
+            _length += written;
+            return written;
+        }
+
         public override int ReadByte() => throw new NotSupportedException();
 
         public override int Read(byte[] buffer, int offset, int count) => _memory.Read(new Memory<byte>(buffer, offset, count));
@@ -89,6 +100,7 @@ namespace Codestellation.SolarWind.Internals
         public int Read(in Span<byte> buffer) => _memory.Read(buffer);
 
         public void CopyInto(Stream stream) => _memory.CopyTo(stream);
+        public Task CopyIntoAsync(Stream stream, CancellationToken cancellation) => _memory.CopyToAsync(stream, cancellation);
 
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
