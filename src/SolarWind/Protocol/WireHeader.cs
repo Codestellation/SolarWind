@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Codestellation.SolarWind.Internals;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Protocol
 {
     //Structure has some reserved space for the future
     [StructLayout(LayoutKind.Sequential, Size = 64)]

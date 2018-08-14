@@ -6,23 +6,19 @@
 // See https://github.com/dotnet/corefx/blob/df43abbed58fa534a36ad1840ff597efc7b00f85/src/Common/tests/System/Threading/Tasks/Sources/ManualResetValueTaskSource.cs
 
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
-// I'd rather know why this was place in such a namespace? Is there any black magic involved?
-namespace System.Runtime.CompilerServices
+namespace Codestellation.SolarWind.Threading
 {
+// I'd rather know why this was place in such a namespace? Is there any black magic involved?
     public interface IStrongBox<T>
     {
         ref T Value { get; }
     }
-}
 
-namespace Codestellation.SolarWind.Threading
-{
     public enum ContinuationOptions
     {
         /// <summary>

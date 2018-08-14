@@ -3,9 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading.Tasks;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Internals
 {
     [DebuggerDisplay("Count = {Count}")]
     public class SimpleQueue<T> : IReadOnlyCollection<T>
@@ -64,7 +63,7 @@ namespace Codestellation.SolarWind
         {
             if (_size == _array.Length)
             {
-                int newcapacity = (int)((long)_array.Length * (long)GrowFactor / 100);
+                var newcapacity = (int)(_array.Length * (long)GrowFactor / 100);
                 if (newcapacity < _array.Length + MinimumGrow)
                 {
                     newcapacity = _array.Length + MinimumGrow;
@@ -82,7 +81,7 @@ namespace Codestellation.SolarWind
         // Enumerator will support removing.
         public Enumerator GetEnumerator() => new Enumerator(this);
 
-        /// <internalonly/>
+        /// <internalonly />
         IEnumerator<T> IEnumerable<T>.GetEnumerator() => new Enumerator(this);
 
         IEnumerator IEnumerable.GetEnumerator() => new Enumerator(this);
@@ -110,7 +109,7 @@ namespace Codestellation.SolarWind
         // must be >= _size.
         private void SetCapacity(int capacity)
         {
-            T[] newarray = new T[capacity];
+            var newarray = new T[capacity];
             if (_size > 0)
             {
                 if (_head < _tail)
@@ -126,7 +125,7 @@ namespace Codestellation.SolarWind
 
             _array = newarray;
             _head = 0;
-            _tail = (_size == capacity) ? 0 : _size;
+            _tail = _size == capacity ? 0 : _size;
         }
 
         // Increments the index wrapping it if necessary.

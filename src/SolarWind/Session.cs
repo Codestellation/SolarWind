@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
+using Codestellation.SolarWind.Protocol;
 using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind

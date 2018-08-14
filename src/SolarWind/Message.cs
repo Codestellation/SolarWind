@@ -1,5 +1,6 @@
 using System;
 using Codestellation.SolarWind.Internals;
+using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind
 {
@@ -16,7 +17,7 @@ namespace Codestellation.SolarWind
             Payload = payload ?? throw new ArgumentNullException(nameof(payload));
         }
 
-        public bool IsEmpty => this.Equals(default);
+        public bool IsEmpty => Equals(default);
 
         public void Dispose()
         {

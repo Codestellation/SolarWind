@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Protocol
 {
     public struct PayloadSize
     {

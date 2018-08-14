@@ -2,7 +2,7 @@ using System.IO;
 using System.Text;
 using Codestellation.SolarWind.Internals;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Protocol
 {
     public class HandshakeMessage
     {

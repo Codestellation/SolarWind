@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind.Internals
 {

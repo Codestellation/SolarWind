@@ -7,11 +7,10 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-using Codestellation.SolarWind.Internals;
-using Codestellation.SolarWind.Misc;
+using Codestellation.SolarWind.Protocol;
 using Codestellation.SolarWind.Threading;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Internals
 {
     public class Connection
     {

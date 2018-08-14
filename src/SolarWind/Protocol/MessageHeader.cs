@@ -1,6 +1,6 @@
 using System;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Protocol
 {
     public readonly struct MessageHeader : IEquatable<MessageHeader>
     {
@@ -9,7 +9,7 @@ namespace Codestellation.SolarWind
 
         public bool IsEmpty => Equals(default);
 
-        public MessageHeader(MessageTypeId typeId,  MessageId messageId)
+        public MessageHeader(MessageTypeId typeId, MessageId messageId)
         {
             TypeId = typeId;
             MessageId = messageId;

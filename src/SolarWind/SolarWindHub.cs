@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
+using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind
 {
@@ -38,10 +39,8 @@ namespace Codestellation.SolarWind
         public void Dispose()
         {
             _disposed = true;
-
             Parallel.ForEach(_channels, c => c.Value.Dispose());
             _listener.Dispose();
-            
         }
 
         private Channel OnChannelAccepted(HubId remoteHubId, Connection connection)

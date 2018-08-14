@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind.Internals
 {

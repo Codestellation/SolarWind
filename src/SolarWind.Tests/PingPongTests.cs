@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
+using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
 using Newtonsoft.Json;
 using NUnit.Framework;

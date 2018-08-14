@@ -3,10 +3,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Codestellation.SolarWind.Internals;
-using Codestellation.SolarWind.Misc;
+using Codestellation.SolarWind.Protocol;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Internals
 {
     public class Listener : IDisposable
     {

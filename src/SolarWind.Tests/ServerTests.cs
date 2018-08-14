@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using Codestellation.SolarWind.Internals;
+using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
 using NUnit.Framework;
 

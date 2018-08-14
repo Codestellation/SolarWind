@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace Codestellation.SolarWind.Misc
+namespace Codestellation.SolarWind.Internals
 {
     public static class Build
     {

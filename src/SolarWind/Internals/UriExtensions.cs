@@ -3,7 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Internals
 {
     public static class UriExtensions
     {
