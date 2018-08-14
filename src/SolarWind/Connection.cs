@@ -9,16 +9,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Misc;
-using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind
 {
     public class Connection
     {
         private readonly Socket _socket;
-        private readonly NetworkStream _networkStream;
+        private readonly AsyncNetworkStream _networkStream;
         private readonly SslStream _sslStream;
-        private readonly AutoResetValueTaskSource<int> _receivedSource;
 
         /// <summary>
         /// Could be either <see cref="NetworkStream" /> or <see cref="SslStream" />
@@ -27,19 +25,18 @@ namespace Codestellation.SolarWind
 
         public bool IsTls => _sslStream != null;
 
-        private Connection(Socket socket, NetworkStream networkStream, SslStream sslStream = null)
+        private Connection(Socket socket, AsyncNetworkStream networkStream, SslStream sslStream = null)
         {
             _socket = socket;
             _networkStream = networkStream;
             _sslStream = sslStream;
             Stream = (Stream)sslStream ?? _networkStream;
             //int is a simply stub case the class implements both IValueTaskSource and IValueTaskSource<T>
-            _receivedSource = new AutoResetValueTaskSource<int>();
         }
 
         public async ValueTask Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            int left = bytesToReceive;
+            var left = bytesToReceive;
 
             while (left != 0)
             {
@@ -48,53 +45,31 @@ namespace Codestellation.SolarWind
                     throw new TaskCanceledException();
                 }
 
-                if (_socket.Available > 0)
-                {
-                    left -= readBuffer.WriteFrom(Stream, left);
-                    continue;
-                }
-
-                await AwailableData(cancellation).ConfigureAwait(false);
+                left += await readBuffer.WriteFromAsync(Stream, bytesToReceive).ConfigureAwait(false);
             }
 
             readBuffer.CompleteWrite();
         }
 
-        private ValueTask AwailableData(CancellationToken cancellation) => _receivedSource.AwaitVoid(cancellation);
-
-        internal bool TryGetSocket(out Socket socket)
-        {
-            if (_receivedSource.IsBeingAwaited)
-            {
-                socket = _socket;
-                return true;
-            }
-
-
-            socket = null;
-            return false;
-        }
-
-        public void NotifyReady() => _receivedSource.SetResult(0);
 
         public void Close() => Stream.Close();
 
-        public void Write(in Message message)
+        public async Task WriteAsync(Message message, CancellationToken cancellation)
         {
             var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
             byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
 
             WireHeader.WriteTo(wireHeader, buffer);
-            Stream.Write(buffer, 0, WireHeader.Size);
+            await Stream.WriteAsync(buffer, 0, WireHeader.Size, cancellation).ConfigureAwait(false);
 
             ArrayPool<byte>.Shared.Return(buffer);
 
-            message.Payload.CopyInto(Stream);
+            await message.Payload.CopyIntoAsync(Stream, cancellation);
         }
 
         public static async Task<Connection> Accept(Socket socket, X509Certificate certificate = null)
         {
-            var networkStream = new NetworkStream(socket, true);
+            var networkStream = new AsyncNetworkStream(socket);
             SslStream sslStream = null;
 
             if (certificate != null)
@@ -121,7 +96,7 @@ namespace Codestellation.SolarWind
                 .ConnectAsync(remoteUri.ResolveRemoteEndpoint())
                 .ConfigureAwait(false);
 
-            var networkStream = new NetworkStream(socket, true);
+            var networkStream = new AsyncNetworkStream(socket);
             SslStream sslStream = null;
             if (remoteUri.UseTls())
             {

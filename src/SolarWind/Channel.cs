@@ -7,7 +7,6 @@ namespace Codestellation.SolarWind
 {
     public class Channel : IDisposable
     {
-        private Connection _connection;
         internal readonly SolarWindHubOptions Options;
 
         private Task _reader;
@@ -15,7 +14,7 @@ namespace Codestellation.SolarWind
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
 
-        internal Connection Connection => _connection;
+        internal Connection Connection { get; private set; }
 
         public Channel(SolarWindHubOptions options)
         {
@@ -27,7 +26,7 @@ namespace Codestellation.SolarWind
         {
             Stop();
             _cancellationSource = new CancellationTokenSource();
-            _connection = connection;
+            Connection = connection;
             _reader = StartReadingTask();
             _writer = StartWritingTask();
         }
@@ -41,7 +40,7 @@ namespace Codestellation.SolarWind
                 await Receive().ConfigureAwait(false);
             }
 
-            _connection.Close();
+            Connection.Close();
         }
 
         private async ValueTask Receive()
@@ -74,7 +73,7 @@ namespace Codestellation.SolarWind
             _session.EnqueueIncoming(message);
         }
 
-        private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
+        private ValueTask Receive(PooledMemoryStream buffer, int count) => Connection.Receive(buffer, count, _cancellationSource.Token);
 
         private async Task StartWritingTask()
         {
@@ -89,7 +88,7 @@ namespace Codestellation.SolarWind
 
                     using (message)
                     {
-                        _connection.Write(message);
+                        await Connection.WriteAsync(message, _cancellationSource.Token).ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException)

@@ -25,11 +25,11 @@ namespace Codestellation.SolarWind
         {
             _channel = channel;
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
-            _serializationQueue = new AwaitableQueue<(MessageHeader, object data)>(ContinuationOptions.ForceThreadPool);
+            _serializationQueue = new AwaitableQueue<(MessageHeader, object data)>();
             _outgoingQueue = new AwaitableQueue<Message>();
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
             // message processing as well and thus stop reading all the sockets. 
-            _incomingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceThreadPool);
+            _incomingQueue = new AwaitableQueue<Message>();
             _disposal = new CancellationTokenSource();
 
             _serialization = StartSerializationTask();

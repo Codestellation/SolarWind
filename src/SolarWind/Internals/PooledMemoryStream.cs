@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -77,7 +79,16 @@ namespace Codestellation.SolarWind.Internals
 
         public int WriteFrom(Stream from, int length)
         {
-            int written = _memory.WriteFrom(from, length);
+            var written = _memory.WriteFrom(from, length);
+            _length += written;
+            return written;
+        }
+
+        public async Task<int> WriteFromAsync(Stream from, int length)
+        {
+            var written = await _memory
+                .WriteFromAsync(from, length)
+                .ConfigureAwait(false);
             _length += written;
             return written;
         }
@@ -102,5 +113,7 @@ namespace Codestellation.SolarWind.Internals
         public void CompleteWrite() => _memory.CompleteWrite();
 
         public void CompleteRead() => _memory.CompleteRead();
+
+        public Task CopyIntoAsync(Stream stream, CancellationToken cancellation) => _memory.CopyToAsync(stream, cancellation);
     }
 }

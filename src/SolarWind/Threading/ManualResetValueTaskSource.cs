@@ -263,12 +263,14 @@ namespace Codestellation.SolarWind.Threading
         public void SetResult(in TResult result)
         {
             _result = result;
+            Thread.MemoryBarrier();
             SignalCompletion();
         }
 
         public void SetException(Exception error)
         {
             _error = ExceptionDispatchInfo.Capture(error);
+            Thread.MemoryBarrier();
             SignalCompletion();
         }
 
