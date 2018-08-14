@@ -1,3 +1,6 @@
+// This code is a stripped version of the .net core queue
+// See https://github.com/dotnet/corefx/blob/master/src/System.Collections/src/System/Collections/Generic/Queue.cs
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -53,10 +56,6 @@ namespace Codestellation.SolarWind.Internals
             _tail = 0;
         }
 
-        //public ValueTask<T> WaitNext()
-        //{
-
-        //}
 
         // Adds item to the tail of the queue.
         public void Enqueue(in T item)
@@ -142,8 +141,6 @@ namespace Codestellation.SolarWind.Internals
 
             index = tmp;
         }
-
-        private void ThrowForEmptyQueue() => throw new InvalidOperationException("Queue is empty");
 
         [SuppressMessage("Microsoft.Performance", "CA1815:OverrideEqualsAndOperatorEqualsOnValueTypes", Justification = "not an expected scenario")]
         public struct Enumerator : IEnumerator<T>

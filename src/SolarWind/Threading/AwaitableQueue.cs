@@ -1,17 +1,17 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Internals;
 
 namespace Codestellation.SolarWind.Threading
 {
     public class AwaitableQueue<T>
     {
-        private readonly Queue<T> _queue;
+        private readonly SimpleQueue<T> _queue;
         private readonly AutoResetValueTaskSource<T> _source;
 
         public AwaitableQueue(ContinuationOptions options = ContinuationOptions.None)
         {
-            _queue = new Queue<T>();
+            _queue = new SimpleQueue<T>(10);
             _source = new AutoResetValueTaskSource<T>(options);
         }
 
@@ -34,7 +34,7 @@ namespace Codestellation.SolarWind.Threading
         {
             lock (_queue)
             {
-                return _queue.Count == 0 ? _source.AwaitValue(cancellation) : new ValueTask<T>(_queue.Dequeue());
+                return _queue.TryDequeue(out T result) ? new ValueTask<T>(result) : _source.AwaitValue(cancellation);
             }
         }
     }
