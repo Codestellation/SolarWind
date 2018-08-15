@@ -84,9 +84,9 @@ namespace Codestellation.SolarWind.Internals
             return written;
         }
 
-        public async Task<int> WriteFromAsync(Stream @from, int length, CancellationToken cancellation)
+        public async ValueTask<int> WriteFromAsync(AsyncNetworkStream from, int length, CancellationToken cancellation)
         {
-            var written = await _memory
+            int written = await _memory
                 .WriteFromAsync(from, length, cancellation)
                 .ConfigureAwait(false);
             _length += written;
@@ -100,7 +100,7 @@ namespace Codestellation.SolarWind.Internals
         public int Read(in Span<byte> buffer) => _memory.Read(buffer);
 
         public void CopyInto(Stream stream) => _memory.CopyTo(stream);
-        public Task CopyIntoAsync(Stream stream, CancellationToken cancellation) => _memory.CopyToAsync(stream, cancellation);
+        public ValueTask CopyIntoAsync(AsyncNetworkStream stream, CancellationToken cancellation) => _memory.CopyToAsync(stream, cancellation);
 
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 

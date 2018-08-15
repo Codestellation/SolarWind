@@ -75,7 +75,7 @@ namespace Codestellation.SolarWind
             _session.EnqueueIncoming(message);
         }
 
-        private Task Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
+        private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
 
         private async Task StartWritingTask()
         {

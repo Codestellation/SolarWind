@@ -72,7 +72,7 @@ namespace Codestellation.SolarWind.Internals
             return count - left;
         }
 
-        internal async Task<int> WriteFromAsync(Stream source, int count, CancellationToken cancellation)
+        internal async ValueTask<int> WriteFromAsync(AsyncNetworkStream source, int count, CancellationToken cancellation)
         {
             if (count == 0)
             {
@@ -84,19 +84,12 @@ namespace Codestellation.SolarWind.Internals
             do
             {
                 Memory<byte> to = Writer.GetMemory(1);
-                if (MemoryMarshal.TryGetArray(to, out ArraySegment<byte> buffer))
-                {
-                    int bytesToRead = Math.Min(left, buffer.Count - buffer.Offset);
-                    readBytes = await source
-                        .ReadAsync(buffer.Array, buffer.Offset, bytesToRead, cancellation)
-                        .ConfigureAwait(false);
-                    left -= readBytes;
-                    Writer.Advance(readBytes);
-                }
-                else
-                {
-                    ThrowMemoryIsNotAnArray();
-                }
+                int bytesToRead = Math.Min(left, to.Length);
+                readBytes = await source
+                    .ReadAsync(to.Slice(0, bytesToRead), cancellation)
+                    .ConfigureAwait(false);
+                left -= readBytes;
+                Writer.Advance(readBytes);
             } while (left > 0 && readBytes > 0);
 
             return count - left;
@@ -185,14 +178,12 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        public async Task CopyToAsync(Stream stream, CancellationToken cancellation)
+        public async ValueTask CopyToAsync(AsyncNetworkStream stream, CancellationToken cancellation)
         {
             if (!Reader.TryRead(out ReadResult from))
             {
                 return;
             }
-
-
             var bytesRead = 0;
             if (!from.IsCanceled)
             {
@@ -200,13 +191,8 @@ namespace Codestellation.SolarWind.Internals
 
                 foreach (ReadOnlyMemory<byte> segment in buffer)
                 {
-                    if (!MemoryMarshal.TryGetArray(segment, out ArraySegment<byte> array))
-                    {
-                        ThrowMemoryIsNotAnArray();
-                    }
-
-                    await stream.WriteAsync(array.Array, array.Offset, array.Count, cancellation).ConfigureAwait(false);
-                    bytesRead += array.Count;
+                    await stream.WriteAsync(segment, cancellation).ConfigureAwait(false);
+                    bytesRead += segment.Length;
 
                     //Free buffers asap
                     SequencePosition end = buffer.GetPosition(bytesRead);

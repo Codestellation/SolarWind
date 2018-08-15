@@ -13,6 +13,13 @@ namespace Codestellation.SolarWind.Tests
     [TestFixture]
     public class ServerTests
     {
+        public class AsyncTcpClient : TcpClient
+        {
+            private AsyncNetworkStream _stream;
+            public AsyncNetworkStream Stream => _stream ?? (_stream = new AsyncNetworkStream(Client));
+        }
+
+
         private SolarWindHub _hub;
         private Uri _uri;
         private MemoryStream _messageBuffer;
@@ -79,19 +86,13 @@ namespace Codestellation.SolarWind.Tests
             using (TcpClient client = CreateClient())
             {
                 const int chunkSize = 7;
-                for (var i = 0; i < 12; i++)
+                for (var i = 0; i < 6; i++)
                 {
                     client.Client.Send(_messageBuffer.GetBuffer(), i * chunkSize, chunkSize, SocketFlags.None);
                     Thread.Sleep(100);
-
-                    if (i == 5)
-                    {
-                        client.Client.Disconnect(true);
-                        client.Dispose();
-                    }
-
-                    break;
                 }
+
+                client.Close();
             }
 
             Thread.Sleep(1000);
@@ -126,15 +127,15 @@ namespace Codestellation.SolarWind.Tests
 
         private TcpClient CreateClient()
         {
-            var client = new TcpClient();
+            var client = new AsyncTcpClient();
             if (!Debugger.IsAttached)
             {
                 client.ReceiveTimeout = 5000;
             }
 
             client.Connect(_uri.Host, _uri.Port);
-            client.GetStream().SendHandshake(_clientHubId);
-            HandshakeMessage _ = client.GetStream().ReceiveHandshake().Result;
+            client.Stream.SendHandshake(_clientHubId);
+            HandshakeMessage _ = client.Stream.ReceiveHandshake().Result;
             return client;
         }
     }

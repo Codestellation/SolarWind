@@ -1,5 +1,7 @@
+using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
 
@@ -20,7 +22,7 @@ namespace Codestellation.SolarWind.Internals
             WireHeader.WriteTo(in wireHeader, buffer);
         }
 
-        public static Task SendHandshake(this Stream networkStream, HubId hubId)
+        public static ValueTask SendHandshake(this AsyncNetworkStream networkStream, HubId hubId)
         {
             //TODO: Use buffer pool one day
             var buffer = new byte[1024];
@@ -29,15 +31,16 @@ namespace Codestellation.SolarWind.Internals
             var msgHeader = new MessageHeader(MessageTypeId.Handshake, MessageId.Empty);
             var outgoingHeader = new WireHeader(msgHeader, new PayloadSize(payloadSize));
             WireHeader.WriteTo(in outgoingHeader, buffer);
-            return networkStream.WriteAsync(buffer, 0, WireHeader.Size + payloadSize);
+            var memory = new ReadOnlyMemory<byte>(buffer, 0, WireHeader.Size + payloadSize);
+            return networkStream.WriteAsync(memory,CancellationToken.None);
         }
 
-        public static async Task<HandshakeMessage> ReceiveHandshake(this Stream self)
+        public static async ValueTask<HandshakeMessage> ReceiveHandshake(this AsyncNetworkStream self)
         {
             PooledMemoryStream buffer = PooledMemoryStream.Rent();
             try
             {
-                if (!await ReceiveBytesAsync(self, WireHeader.Size, buffer).ConfigureAwait(false))
+                if (!await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(false))
                 {
                     return null;
                 }
@@ -52,7 +55,7 @@ namespace Codestellation.SolarWind.Internals
                     return null;
                 }
 
-                if (!await ReceiveBytesAsync(self, wireHeader.PayloadSize.Value, buffer).ConfigureAwait(false))
+                if (!await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false))
                 {
                     return null;
                 }
@@ -67,12 +70,14 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        private static async Task<bool> ReceiveBytesAsync(this Stream self, int bytesToReceive, PooledMemoryStream readBuffer)
+        private static async ValueTask<bool> ReceiveBytesAsync(this AsyncNetworkStream self, PooledMemoryStream readBuffer, int bytesToReceive)
         {
             int left = bytesToReceive;
             do
             {
-                left -= readBuffer.WriteFrom(self, left);
+                left -= await readBuffer
+                    .WriteFromAsync(self, left, CancellationToken.None)
+                    .ConfigureAwait(false);
             } while (left != 0);
 
             readBuffer.CompleteWrite();
