@@ -42,7 +42,10 @@ namespace Codestellation.SolarWind
         {
             while (!_disposal.IsCancellationRequested)
             {
-                (MessageHeader header, object data) = await _serializationQueue.Await(_disposal.Token).ConfigureAwait(false);
+                (MessageHeader header, object data) = await _serializationQueue
+                    .Await(_disposal.Token)
+                    .ConfigureAwait(false);
+
                 PooledMemoryStream payload = PooledMemoryStream.Rent();
                 try
                 {
@@ -53,10 +56,12 @@ namespace Codestellation.SolarWind
                 }
                 catch (OperationCanceledException)
                 {
+                    PooledMemoryStream.ResetAndReturn(payload);
                     break;
                 }
                 catch (Exception e)
                 {
+                    PooledMemoryStream.ResetAndReturn(payload);
                     //TODO: Better logging
                     Console.WriteLine(e);
                 }
