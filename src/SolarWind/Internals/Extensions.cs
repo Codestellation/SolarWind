@@ -28,11 +28,11 @@ namespace Codestellation.SolarWind.Internals
             var buffer = new byte[1024];
             //TODO: Check where we have written all the text
             int payloadSize = Encoding.UTF8.GetBytes(hubId.Id, 0, hubId.Id.Length, buffer, WireHeader.Size);
-            var msgHeader = new MessageHeader(MessageTypeId.Handshake, MessageId.Empty);
+            var msgHeader = new MessageHeader(MessageTypeId.Handshake, MessageId.Empty, MessageId.Empty);
             var outgoingHeader = new WireHeader(msgHeader, new PayloadSize(payloadSize));
             WireHeader.WriteTo(in outgoingHeader, buffer);
             var memory = new ReadOnlyMemory<byte>(buffer, 0, WireHeader.Size + payloadSize);
-            return networkStream.WriteAsync(memory,CancellationToken.None);
+            return networkStream.WriteAsync(memory, CancellationToken.None);
         }
 
         public static async ValueTask<HandshakeMessage> ReceiveHandshake(this AsyncNetworkStream self)

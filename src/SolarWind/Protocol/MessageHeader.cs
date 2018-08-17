@@ -6,13 +6,15 @@ namespace Codestellation.SolarWind.Protocol
     {
         public readonly MessageTypeId TypeId;
         public readonly MessageId MessageId;
+        public readonly MessageId ReplyTo;
 
         public bool IsEmpty => Equals(default);
 
-        public MessageHeader(MessageTypeId typeId, MessageId messageId)
+        public MessageHeader(MessageTypeId typeId, MessageId messageId, MessageId replyTo)
         {
             TypeId = typeId;
             MessageId = messageId;
+            ReplyTo = replyTo;
         }
 
         public bool Equals(MessageHeader other) => TypeId.Equals(other.TypeId) && MessageId.Equals(other.MessageId);

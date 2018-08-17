@@ -39,7 +39,7 @@ namespace Codestellation.SolarWind.Tests
             _hub.Listen(_uri);
 
 
-            var header = new MessageHeader(new MessageTypeId(1), MessageId.Empty);
+            var header = new MessageHeader(new MessageTypeId(1), MessageId.Empty, MessageId.Empty);
             var data = new TextMessage {Text = "Greetings"};
 
             _messageBuffer = new MemoryStream();

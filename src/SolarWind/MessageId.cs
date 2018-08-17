@@ -3,7 +3,7 @@ using System;
 namespace Codestellation.SolarWind
 {
     /// <summary>
-    /// MessageId is per channel, no
+    /// MessageId is per channel
     /// </summary>
     public struct MessageId : IEquatable<MessageId>
     {

@@ -96,7 +96,7 @@ namespace Codestellation.SolarWind
 
         public void EnqueueIncoming(in Message message) => _incomingQueue.Enqueue(message);
 
-        public MessageId EnqueueOutgoing(MessageTypeId typeId, object data)
+        public MessageId EnqueueOutgoing(MessageTypeId typeId, object data, MessageId replyTo)
         {
             MessageId id;
             lock (_outgoingQueue)
@@ -104,7 +104,7 @@ namespace Codestellation.SolarWind
                 id = _currentMessageId = _currentMessageId.Next();
             }
 
-            var header = new MessageHeader(typeId, id);
+            var header = new MessageHeader(typeId, id, replyTo);
             _serializationQueue.Enqueue((header, data));
             return id;
         }

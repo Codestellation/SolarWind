@@ -35,7 +35,6 @@ namespace Codestellation.SolarWind
             return OnChannelAccepted(handshakeResponse.HubId, connection);
         }
 
-
         public void Dispose()
         {
             _disposed = true;

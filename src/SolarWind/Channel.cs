@@ -33,7 +33,14 @@ namespace Codestellation.SolarWind
             _writer = StartWritingTask();
         }
 
-        public MessageId Post(MessageTypeId typeId, object data) => _session.EnqueueOutgoing(typeId, data);
+        /// <summary>
+        /// Puts a message into send queue and returns assigned message identifier
+        /// </summary>
+        /// <param name="typeId">Type of to be transferred over the wirer</param>
+        /// <param name="data">The message</param>
+        /// <param name="replyTo">An id of the message which is </param>
+        /// <returns>An assigned id to the outgoing message</returns>
+        public MessageId Post(MessageTypeId typeId, object data, MessageId replyTo = default) => _session.EnqueueOutgoing(typeId, data, replyTo);
 
         private async Task StartReadingTask()
         {
