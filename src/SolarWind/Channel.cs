@@ -9,7 +9,7 @@ namespace Codestellation.SolarWind
     public class Channel : IDisposable
     {
         private Connection _connection;
-        internal readonly SolarWindHubOptions Options;
+        internal readonly ChannelOptions Options;
 
         private Task _reader;
         private Task _writer;
@@ -18,7 +18,7 @@ namespace Codestellation.SolarWind
 
         internal Connection Connection => _connection;
 
-        public Channel(SolarWindHubOptions options)
+        public Channel(ChannelOptions options)
         {
             Options = options;
             _session = new Session(this);

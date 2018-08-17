@@ -11,10 +11,8 @@ namespace Codestellation.SolarWind.Tests
     [TestFixture]
     public class PingPongTests
     {
-        private SolarWindHubOptions _serverOptions;
         private SolarWindHub _server;
         private Uri _serverUri;
-        private SolarWindHubOptions _clientOptions;
         private SolarWindHub _client;
         private Channel _channelToServer;
         private ManualResetEvent _serverReceivedMessage;
@@ -26,23 +24,13 @@ namespace Codestellation.SolarWind.Tests
             _serverUri = new Uri("tcp://localhost:4312");
 
             var jsonNetSerializer = new JsonNetSerializer();
-            _serverOptions = new SolarWindHubOptions
-            {
-                Callback = OnServerCallback,
-                Serializer = jsonNetSerializer
-            };
-            _server = new SolarWindHub(_serverOptions);
+
+            _server = new SolarWindHub(new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, OnServerCallback)));
 
             _server.Listen(_serverUri);
 
-            _clientOptions = new SolarWindHubOptions
-            {
-                Callback = OnClientCallback,
-                Serializer = jsonNetSerializer
-            };
-
-            _client = new SolarWindHub(_clientOptions);
-            _channelToServer = _client.Connect(_serverUri);
+            _client = new SolarWindHub(new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, delegate { })));
+            _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, OnClientCallback));
 
             _serverReceivedMessage = new ManualResetEvent(false);
             _clientReceivedMessage = new ManualResetEvent(false);
