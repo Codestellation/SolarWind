@@ -8,7 +8,10 @@ using System.Threading.Tasks;
 
 namespace Codestellation.SolarWind.Internals
 {
-    public class MemoryOwner
+    /// <summary>
+    /// TODO: Consider inlining it into the pooled memory stream class
+    /// </summary>
+    internal class MemoryOwner
     {
         private readonly Pipe _pipe;
 

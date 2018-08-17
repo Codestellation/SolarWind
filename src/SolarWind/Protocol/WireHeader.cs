@@ -6,7 +6,7 @@ namespace Codestellation.SolarWind.Protocol
 {
     //Structure has some reserved space for the future
     [StructLayout(LayoutKind.Sequential, Size = 64)]
-    public struct WireHeader
+    internal struct WireHeader
     {
         public static readonly unsafe int Size = sizeof(WireHeader);
 

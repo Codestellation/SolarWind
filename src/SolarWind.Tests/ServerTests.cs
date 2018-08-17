@@ -23,7 +23,6 @@ namespace Codestellation.SolarWind.Tests
         private SolarWindHub _hub;
         private Uri _uri;
         private MemoryStream _messageBuffer;
-        private Message _message;
         private HubId _clientHubId;
         private JsonNetSerializer _serializer;
 
@@ -31,7 +30,7 @@ namespace Codestellation.SolarWind.Tests
         public void Setup()
         {
             _serializer = new JsonNetSerializer();
-            var options = new SolarWindHubOptions(_ => new ChannelOptions(_serializer, OnCallback), (_,__) => { return; });
+            var options = new SolarWindHubOptions(_ => new ChannelOptions(_serializer, OnCallback), (_, __) => { });
 
             _hub = new SolarWindHub(options);
             _uri = new Uri("tcp://localhost:4312");

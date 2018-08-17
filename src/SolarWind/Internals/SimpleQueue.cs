@@ -10,7 +10,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Codestellation.SolarWind.Internals
 {
     [DebuggerDisplay("Count = {Count}")]
-    public class SimpleQueue<T> : IReadOnlyCollection<T>
+    internal class SimpleQueue<T> : IReadOnlyCollection<T>
     {
         private T[] _array;
         private int _head; // The index from which to dequeue if the queue isn't empty.

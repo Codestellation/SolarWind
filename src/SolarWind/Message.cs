@@ -4,7 +4,7 @@ using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind
 {
-    public readonly struct Message : IDisposable
+    internal readonly struct Message : IDisposable
     {
         public readonly MessageHeader Header;
         public readonly PooledMemoryStream Payload;

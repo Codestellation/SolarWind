@@ -2,7 +2,7 @@ using System.IO;
 
 namespace Codestellation.SolarWind.Protocol
 {
-    public struct PayloadSize
+    internal struct PayloadSize
     {
         public readonly int Value;
 

@@ -8,7 +8,7 @@ using Codestellation.SolarWind.Threading;
 namespace Codestellation.SolarWind
 {
     //TODO: When channel is being disposed dispose all messages in all queues to return streams to pool
-    public class Session : IDisposable
+    internal class Session : IDisposable
     {
         //Supposed to be used with the session class only
         public delegate void DeserializationCallback(in MessageHeader header, object data);
@@ -26,7 +26,7 @@ namespace Codestellation.SolarWind
         private readonly Task _serialization;
         private readonly Task _deserialization;
 
-        public Session(ISerializer serializer,  DeserializationCallback callback)
+        public Session(ISerializer serializer, DeserializationCallback callback)
         {
             _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             _callback = callback ?? throw new ArgumentNullException(nameof(callback));

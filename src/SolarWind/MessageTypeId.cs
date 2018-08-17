@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Codestellation.SolarWind
 {
@@ -13,7 +14,7 @@ namespace Codestellation.SolarWind
         //Server or client should send it in case of graceful shutdown. 
         internal static readonly MessageTypeId Bye = new MessageTypeId(-100L);
 
-        public readonly int Id;
+        private readonly int _id;
 
         public MessageTypeId(int id)
         {
@@ -22,24 +23,27 @@ namespace Codestellation.SolarWind
                 throw new ArgumentException("Must be equal to or greater than 0", nameof(id));
             }
 
-            Id = id;
+            _id = id;
         }
 
         //It's a life hack to have to constructors with the same signature
-        private MessageTypeId(long id)
-        {
-            Id = (int)id;
-        }
+        private MessageTypeId(long id) => _id = (int)id;
 
 
-        public bool Equals(MessageTypeId other) => Id == other.Id;
+        /// <inheritdoc />
+        public bool Equals(MessageTypeId other) => _id == other._id;
 
+        /// <inheritdoc />
         public override bool Equals(object obj) => obj is MessageTypeId id && Equals(id);
 
-        public override int GetHashCode() => Id;
+        /// <inheritdoc />
+        public override int GetHashCode() => _id;
 
         public static bool operator ==(MessageTypeId left, MessageTypeId right) => left.Equals(right);
 
         public static bool operator !=(MessageTypeId left, MessageTypeId right) => !left.Equals(right);
+
+        /// <inheritdoc />
+        public override string ToString() => _id.ToString(CultureInfo.InvariantCulture);
     }
 }
