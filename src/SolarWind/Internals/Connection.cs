@@ -2,14 +2,13 @@ using System;
 using System.Buffers;
 using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind.Internals
 {
-    public class Connection
+    internal class Connection
     {
         private readonly AsyncNetworkStream _networkStream;
 
@@ -26,7 +25,7 @@ namespace Codestellation.SolarWind.Internals
 
         public async ValueTask Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            int left = bytesToReceive;
+            var left = bytesToReceive;
 
             while (left != 0)
             {
@@ -56,7 +55,7 @@ namespace Codestellation.SolarWind.Internals
             await message.Payload.CopyIntoAsync(Stream, cancellation);
         }
 
-        public static async Task<Connection> Accept(Socket socket, X509Certificate certificate = null)
+        public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
         {
             var networkStream = new AsyncNetworkStream(socket);
             //SslStream sslStream = null;
@@ -75,7 +74,12 @@ namespace Codestellation.SolarWind.Internals
             //    }
             //}
 
-            return new Connection(networkStream);
+
+            HandshakeMessage incoming = await networkStream
+                .HandshakeAsServer(options.HubId)
+                .ConfigureAwait(false);
+            var connection = new Connection(networkStream);
+            onAccepted(incoming.HubId, connection);
         }
 
         public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
@@ -107,5 +111,7 @@ namespace Codestellation.SolarWind.Internals
             var connection = new Connection(networkStream);
             onConnected(remoteUri, handshakeResponse.HubId, connection);
         }
+
+        private static void ConfigureSocket(Socket socket) => socket.ReceiveTimeout = 10_000;
     }
 }

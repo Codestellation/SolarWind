@@ -5,10 +5,9 @@ namespace Codestellation.SolarWind.Internals
 {
     public static class ConnectionExtensions
     {
-        public static async Task<HandshakeMessage> HandshakeAsServer(this Connection connection, HubId hubId)
+        internal static async Task<HandshakeMessage> HandshakeAsServer(this AsyncNetworkStream stream, HubId hubId)
         {
-            HandshakeMessage incoming = await connection
-                .Stream
+            HandshakeMessage incoming = await stream
                 .ReceiveHandshake()
                 .ConfigureAwait(false);
 
@@ -17,8 +16,7 @@ namespace Codestellation.SolarWind.Internals
                 return null;
             }
 
-            await connection
-                .Stream
+            await stream
                 .SendHandshake(hubId)
                 .ConfigureAwait(false);
             return incoming;
