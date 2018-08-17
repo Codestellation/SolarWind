@@ -27,7 +27,10 @@ namespace Codestellation.SolarWind
         }
 
         //It's a life hack to have to constructors with the same signature
-        private MessageTypeId(long id) => _id = (int)id;
+        private MessageTypeId(long id)
+        {
+            _id = (int)id;
+        }
 
 
         /// <inheritdoc />

@@ -1,8 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using Codestellation.SolarWind.Protocol;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Servers
 {
     public class SolarWindServer
     {
@@ -20,6 +19,6 @@ namespace Codestellation.SolarWind
 
         public MessageId Send(object data) => _channel.Post(data);
 
-        private void OnCallback(Channel channel,in  MessageHeader header, object data) => _callback(header.MessageId, data);
+        private void OnCallback(Channel channel, in MessageHeader header, object data) => _callback(header.MessageId, data);
     }
 }

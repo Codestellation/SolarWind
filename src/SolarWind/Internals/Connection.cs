@@ -57,6 +57,7 @@ namespace Codestellation.SolarWind.Internals
 
         public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
         {
+            ConfigureSocket(socket);
             var networkStream = new AsyncNetworkStream(socket);
             //SslStream sslStream = null;
 
@@ -85,6 +86,7 @@ namespace Codestellation.SolarWind.Internals
         public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
         {
             Socket socket = Build.TcpIPv4();
+            ConfigureSocket(socket);
             await socket
                 .ConnectAsync(remoteUri.ResolveRemoteEndpoint())
                 .ConfigureAwait(false);

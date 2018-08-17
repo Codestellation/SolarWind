@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
 using Codestellation.SolarWind.Threading;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Clients
 {
     public class SolarWindClient
     {
@@ -38,7 +38,7 @@ namespace Codestellation.SolarWind
 
         public void NotifyAsync<TNotification>(TNotification notification) => _channel.Post(notification);
 
-        private void OnSolarWindCallback(Channel channel,in MessageHeader header, object data)
+        private void OnSolarWindCallback(Channel channel, in MessageHeader header, object data)
         {
             // It's possible that result will be available before task completion source was added to the registry
             // so put the result itself into the registry. 

@@ -1,8 +1,7 @@
 using System;
-using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Internals
 {
     internal readonly struct Message : IDisposable
     {

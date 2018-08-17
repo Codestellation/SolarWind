@@ -1,11 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using Codestellation.SolarWind.Threading;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Internals
 {
     //TODO: When channel is being disposed dispose all messages in all queues to return streams to pool
     internal class Session : IDisposable

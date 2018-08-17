@@ -6,7 +6,10 @@ using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind
 {
-    public class Channel : IDisposable
+    /// <summary>
+    /// Channel is an abstraction over a connection between two hosts. It provides duplex asynchronous messages stream.
+    /// </summary>
+    public class Channel
     {
         private Connection _connection;
         private readonly ChannelOptions _options;
@@ -16,8 +19,6 @@ namespace Codestellation.SolarWind
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
         private SolarWindCallback _callback;
-
-        internal Connection Connection => _connection;
 
         public Channel(ChannelOptions options)
         {
@@ -116,7 +117,7 @@ namespace Codestellation.SolarWind
 
                     using (message)
                     {
-                        await Connection
+                        await _connection
                             .WriteAsync(message, _cancellationSource.Token)
                             .ConfigureAwait(false);
                     }
@@ -128,7 +129,8 @@ namespace Codestellation.SolarWind
             }
         }
 
-        public void Dispose()
+        //It's made internal to avoid occasional calls from user's code. 
+        internal void Dispose()
         {
             Stop();
             _session.Dispose();

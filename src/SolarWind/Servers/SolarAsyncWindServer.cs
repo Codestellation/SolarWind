@@ -2,10 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
 
-namespace Codestellation.SolarWind
+namespace Codestellation.SolarWind.Servers
 {
-    public delegate ValueTask<object> AsyncMessageProcessor(object data);
-
     public class SolarAsyncWindServer
     {
         private readonly Channel _channel;
