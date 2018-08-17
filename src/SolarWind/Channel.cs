@@ -25,7 +25,7 @@ namespace Codestellation.SolarWind
             _session = new Session(options.Serializer, OnIncomingMessage);
         }
 
-        public void OnReconnect(Connection connection)
+        internal void OnReconnect(Connection connection)
         {
             Stop();
             _cancellationSource = new CancellationTokenSource();

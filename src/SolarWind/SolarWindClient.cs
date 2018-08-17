@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
+using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind
 {
@@ -21,7 +22,7 @@ namespace Codestellation.SolarWind
         {
             MessageId id = _channel.Post(request);
 
-            object result = _requestRegistry.GetOrAdd(id, msgId => new SolarWindCompleteionSource<TResponse>());
+            object result = _requestRegistry.GetOrAdd(id, msgId => new SolarWindCompletionSource<TResponse>());
             //It's highly unlikely but possible that response will come before adding completion source in the dictionary
             // In such a case return the value immediately
             if (result is TResponse response)
