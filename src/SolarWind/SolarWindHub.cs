@@ -73,7 +73,10 @@ namespace Codestellation.SolarWind
         private Channel OnAccepted(HubId remoteHubId, Connection connection)
         {
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
-            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(_hubOptions.OnChannelAccepted(id.Remote)));
+
+            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(_hubOptions.Before(id.Remote)));
+            _hubOptions.After(channelId, channel);
+
             channel.OnReconnect(connection);
             return channel;
         }

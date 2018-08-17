@@ -10,23 +10,29 @@ namespace Codestellation.SolarWind
     //TODO: When channel is being disposed dispose all messages in all queues to return streams to pool
     public class Session : IDisposable
     {
-        private readonly Channel _channel;
+        //Supposed to be used with the session class only
+        public delegate void DeserializationCallback(in MessageHeader header, object data);
+
+        private readonly ISerializer _serializer;
+        private readonly DeserializationCallback _callback;
         private readonly AwaitableQueue<Message> _outgoingQueue;
 
         private MessageId _currentMessageId;
         private readonly AwaitableQueue<Message> _incomingQueue;
 
         private readonly CancellationTokenSource _disposal;
-        private readonly AwaitableQueue<(MessageHeader, object data)> _serializationQueue;
+        private readonly AwaitableQueue<(MessageId id, MessageId replyTo, object data)> _serializationQueue;
 
         private readonly Task _serialization;
         private readonly Task _deserialization;
 
-        public Session(Channel channel)
+        public Session(ISerializer serializer,  DeserializationCallback callback)
         {
-            _channel = channel;
+            _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+            _callback = callback ?? throw new ArgumentNullException(nameof(callback));
+
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
-            _serializationQueue = new AwaitableQueue<(MessageHeader, object data)>(ContinuationOptions.ForceDefaultTaskScheduler);
+            _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ForceDefaultTaskScheduler);
             _outgoingQueue = new AwaitableQueue<Message>();
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
@@ -42,15 +48,16 @@ namespace Codestellation.SolarWind
         {
             while (!_disposal.IsCancellationRequested)
             {
-                (MessageHeader header, object data) = await _serializationQueue
+                (MessageId id, MessageId replyTo, object data) = await _serializationQueue
                     .Await(_disposal.Token)
                     .ConfigureAwait(false);
 
                 PooledMemoryStream payload = PooledMemoryStream.Rent();
                 try
                 {
-                    _channel.Options.Serializer.Serialize(data, payload);
+                    MessageTypeId typeId = _serializer.Serialize(data, payload);
                     payload.CompleteWrite();
+                    var header = new MessageHeader(typeId, id, replyTo);
                     var message = new Message(header, payload);
                     _outgoingQueue.Enqueue(message);
                 }
@@ -78,12 +85,12 @@ namespace Codestellation.SolarWind
                 Message incoming;
                 using (incoming = await _incomingQueue.Await(_disposal.Token).ConfigureAwait(false))
                 {
-                    data = _channel.Options.Serializer.Deserialize(incoming.Header.TypeId, incoming.Payload);
+                    data = _serializer.Deserialize(incoming.Header.TypeId, incoming.Payload);
                 }
 
                 try
                 {
-                    _channel.Options.Callback(_channel, incoming.Header, data);
+                    _callback(incoming.Header, data);
                 }
                 catch (Exception e)
                 {
@@ -96,7 +103,7 @@ namespace Codestellation.SolarWind
 
         public void EnqueueIncoming(in Message message) => _incomingQueue.Enqueue(message);
 
-        public MessageId EnqueueOutgoing(MessageTypeId typeId, object data, MessageId replyTo)
+        public MessageId EnqueueOutgoing(object data, MessageId replyTo)
         {
             MessageId id;
             lock (_outgoingQueue)
@@ -104,8 +111,7 @@ namespace Codestellation.SolarWind
                 id = _currentMessageId = _currentMessageId.Next();
             }
 
-            var header = new MessageHeader(typeId, id, replyTo);
-            _serializationQueue.Enqueue((header, data));
+            _serializationQueue.Enqueue((id, replyTo, data));
             return id;
         }
 

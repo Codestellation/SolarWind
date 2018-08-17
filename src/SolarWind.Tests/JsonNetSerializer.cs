@@ -13,15 +13,17 @@ namespace Codestellation.SolarWind.Tests
             _serializer = new JsonSerializer();
         }
 
-        public void Serialize(object data, Stream stream)
+        public MessageTypeId Serialize(object data, Stream stream)
         {
             using (var writer = new StreamWriter(stream, Encoding.UTF8, 1024, true))
             {
                 _serializer.Serialize(writer, data);
             }
+
+            return new MessageTypeId(1);
         }
 
-        public object Deserialize(MessageTypeId prefix, Stream stream)
+        public object Deserialize(MessageTypeId typeId, Stream stream)
         {
             using (var reader = new JsonTextReader(new StreamReader(stream)) {CloseInput = false})
             {

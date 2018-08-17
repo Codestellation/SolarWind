@@ -25,11 +25,13 @@ namespace Codestellation.SolarWind.Tests
 
             var jsonNetSerializer = new JsonNetSerializer();
 
-            _server = new SolarWindHub(new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, OnServerCallback)));
+            var solarWindHubOptions = new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, OnServerCallback), delegate { });
+            _server = new SolarWindHub(solarWindHubOptions);
 
             _server.Listen(_serverUri);
 
-            _client = new SolarWindHub(new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, delegate { })));
+            var clientOptions = new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, delegate { }), delegate { });
+            _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, OnClientCallback));
 
             _serverReceivedMessage = new ManualResetEvent(false);
@@ -46,21 +48,21 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void PingPong()
         {
-            _channelToServer.Post(new MessageTypeId(1), new TextMessage {Text = "Hello, server!"});
+            _channelToServer.Post(new TextMessage {Text = "Hello, server!"});
             TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(1);
             _serverReceivedMessage.WaitOne(timeout).Should().BeTrue("server is expected to receive the request");
             _clientReceivedMessage.WaitOne(timeout).Should().BeTrue("client is expected to receive the response");
         }
 
-        private void OnServerCallback(Channel channel, MessageHeader header, object data)
+        private void OnServerCallback(Channel channel, in MessageHeader messageHeader, object data)
         {
             Console.WriteLine("Message from client:");
             Console.WriteLine(JsonConvert.SerializeObject(data, Formatting.Indented));
-            channel.Post(new MessageTypeId(1), new TextMessage {Text = "Hello, client!"});
+            channel.Post(new TextMessage {Text = "Hello, client!"});
             _serverReceivedMessage.Set();
         }
 
-        private void OnClientCallback(Channel channel, MessageHeader header, object data)
+        private void OnClientCallback(Channel channel, in MessageHeader messageHeader, object data)
         {
             Console.WriteLine("Message from server:");
             Console.WriteLine(JsonConvert.SerializeObject(data, Formatting.Indented));

@@ -8,20 +8,18 @@ namespace Codestellation.SolarWind
     public class SolarWindClient
     {
         private readonly Channel _channel;
-        private readonly Func<Type, MessageTypeId> _typeIdGenerator;
         private readonly ConcurrentDictionary<MessageId, object> _requestRegistry;
 
-        public SolarWindClient(Channel channel, Func<Type, MessageTypeId> typeIdGenerator)
+        public SolarWindClient(Channel channel)
         {
-            _channel = channel;
-            _typeIdGenerator = typeIdGenerator;
+            _channel = channel ?? throw new ArgumentNullException(nameof(channel));
             _requestRegistry = new ConcurrentDictionary<MessageId, object>();
+            channel.SetCallback(OnSolarWindCallback);
         }
 
         public ValueTask<TResponse> SendAsync<TRequest, TResponse>(TRequest request)
         {
-            MessageTypeId typeId = _typeIdGenerator(typeof(TRequest));
-            MessageId id = _channel.Post(typeId, request);
+            MessageId id = _channel.Post(request);
 
             object result = _requestRegistry.GetOrAdd(id, msgId => new SolarWindCompleteionSource<TResponse>());
             //It's highly unlikely but possible that response will come before adding completion source in the dictionary
@@ -37,7 +35,9 @@ namespace Codestellation.SolarWind
             return new ValueTask<TResponse>(completionSource.Task);
         }
 
-        public void OnSolarWindCallback(Channel channel, MessageHeader header, object data)
+        public void NotifyAsync<TNotification>(TNotification notification) => _channel.Post(notification);
+
+        private void OnSolarWindCallback(Channel channel,in MessageHeader header, object data)
         {
             // It's possible that result will be available before task completion source was added to the registry
             // so put the result itself into the registry. 
@@ -48,12 +48,6 @@ namespace Codestellation.SolarWind
                 source.SetGenericResult(data);
                 _requestRegistry.TryRemove(header.ReplyTo, out _);
             }
-        }
-
-        public void NotifyAsync<TNotification>(TNotification notification)
-        {
-            MessageTypeId typeId = _typeIdGenerator(typeof(TNotification));
-            _channel.Post(typeId, notification);
         }
     }
 }

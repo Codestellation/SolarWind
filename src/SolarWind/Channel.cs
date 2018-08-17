@@ -9,19 +9,20 @@ namespace Codestellation.SolarWind
     public class Channel : IDisposable
     {
         private Connection _connection;
-        internal readonly ChannelOptions Options;
+        private readonly ChannelOptions _options;
 
         private Task _reader;
         private Task _writer;
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
+        private SolarWindCallback _callback;
 
         internal Connection Connection => _connection;
 
         public Channel(ChannelOptions options)
         {
-            Options = options;
-            _session = new Session(this);
+            _options = options ?? throw new ArgumentNullException(nameof(options));
+            _session = new Session(options.Serializer, OnIncomingMessage);
         }
 
         public void OnReconnect(Connection connection)
@@ -36,11 +37,18 @@ namespace Codestellation.SolarWind
         /// <summary>
         /// Puts a message into send queue and returns assigned message identifier.
         /// </summary>
-        /// <param name="typeId">Type of to be transferred over the wirer</param>
         /// <param name="data">The message</param>
         /// <param name="replyTo">An id of the message which replies to</param>
         /// <returns>An assigned id to the outgoing message</returns>
-        public MessageId Post(MessageTypeId typeId, object data, MessageId replyTo = default) => _session.EnqueueOutgoing(typeId, data, replyTo);
+        public MessageId Post(object data, MessageId replyTo = default)
+            => _session.EnqueueOutgoing(data, replyTo);
+
+        /// <summary>
+        /// Sets callback for the channel. Previous callback will be replaced with the supplied one.
+        /// </summary>
+        /// <param name="callback"></param>
+        public void SetCallback(SolarWindCallback callback)
+            => _callback = callback ?? throw new ArgumentNullException(nameof(callback));
 
         private async Task StartReadingTask()
         {
@@ -79,6 +87,19 @@ namespace Codestellation.SolarWind
             }
 
             _session.EnqueueIncoming(message);
+        }
+
+        private void OnIncomingMessage(in MessageHeader header, object data)
+        {
+            try
+            {
+                (_callback ?? _options.Callback).Invoke(this, header, data);
+            }
+            catch (Exception e)
+            {
+                //TODO: Log exceptions
+                Console.WriteLine(e);
+            }
         }
 
         private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);

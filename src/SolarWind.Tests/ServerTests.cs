@@ -31,8 +31,8 @@ namespace Codestellation.SolarWind.Tests
         public void Setup()
         {
             _serializer = new JsonNetSerializer();
-            var options = new SolarWindHubOptions(_ => new ChannelOptions(_serializer, OnCallback));
-            
+            var options = new SolarWindHubOptions(_ => new ChannelOptions(_serializer, OnCallback), (_,__) => { return; });
+
             _hub = new SolarWindHub(options);
             _uri = new Uri("tcp://localhost:4312");
             _hub.Listen(_uri);
@@ -107,7 +107,7 @@ namespace Codestellation.SolarWind.Tests
         private static void AssertReceived(TcpClient client)
         {
             var expectedBytes = 87;
-            int left = expectedBytes;
+            var left = expectedBytes;
             var buffer = new byte[512];
             var received = 0;
             do
@@ -122,7 +122,7 @@ namespace Codestellation.SolarWind.Tests
         }
 
 
-        private void OnCallback(Channel channel, MessageHeader header, object data) => channel.Post(header.TypeId, data);
+        private void OnCallback(Channel channel, in MessageHeader messageHeader, object data) => channel.Post(data);
 
         private TcpClient CreateClient()
         {

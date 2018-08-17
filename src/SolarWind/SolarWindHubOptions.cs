@@ -4,11 +4,10 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace Codestellation.SolarWind
 {
-    public delegate ChannelOptions OnChannelAccepted(HubId remoteHubId);
-
     public class SolarWindHubOptions
     {
-        public OnChannelAccepted OnChannelAccepted { get; }
+        public BeforeChannelAccepted Before { get; }
+        public AfterChannelAccepted After { get; }
         public X509Certificate Certificate { get; set; }
 
         /// <summary>
@@ -16,9 +15,10 @@ namespace Codestellation.SolarWind
         /// </summary>
         public HubId HubId { get; }
 
-        public SolarWindHubOptions(OnChannelAccepted onChannelAccepted)
+        public SolarWindHubOptions(BeforeChannelAccepted before, AfterChannelAccepted after)
         {
-            OnChannelAccepted = onChannelAccepted ?? throw new ArgumentNullException(nameof(onChannelAccepted));
+            Before = before ?? throw new ArgumentNullException(nameof(before));
+            After = after ?? throw new ArgumentNullException(nameof(after));
             HubId = new HubId($"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}");
         }
 
