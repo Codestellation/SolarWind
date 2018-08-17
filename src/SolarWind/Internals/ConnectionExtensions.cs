@@ -24,14 +24,13 @@ namespace Codestellation.SolarWind.Internals
             return incoming;
         }
 
-        public static async Task<HandshakeMessage> HandshakeAsClient(this Connection connection, HubId hubId)
+        public static async Task<HandshakeMessage> HandshakeAsClient(this AsyncNetworkStream stream, HubId hubId)
         {
-            await connection.Stream
+            await stream
                 .SendHandshake(hubId)
                 .ConfigureAwait(false);
 
-            HandshakeMessage handshakeResponse = await connection
-                .Stream
+            HandshakeMessage handshakeResponse = await stream
                 .ReceiveHandshake()
                 .ConfigureAwait(false);
 

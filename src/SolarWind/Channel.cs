@@ -34,11 +34,11 @@ namespace Codestellation.SolarWind
         }
 
         /// <summary>
-        /// Puts a message into send queue and returns assigned message identifier
+        /// Puts a message into send queue and returns assigned message identifier.
         /// </summary>
         /// <param name="typeId">Type of to be transferred over the wirer</param>
         /// <param name="data">The message</param>
-        /// <param name="replyTo">An id of the message which is </param>
+        /// <param name="replyTo">An id of the message which replies to</param>
         /// <returns>An assigned id to the outgoing message</returns>
         public MessageId Post(MessageTypeId typeId, object data, MessageId replyTo = default) => _session.EnqueueOutgoing(typeId, data, replyTo);
 
@@ -54,7 +54,6 @@ namespace Codestellation.SolarWind
 
         private async Task Receive()
         {
-            //TODO: Error handling routines
             PooledMemoryStream buffer = PooledMemoryStream.Rent();
             Message message;
             try
@@ -90,7 +89,6 @@ namespace Codestellation.SolarWind
             {
                 try
                 {
-                    //TODO: Consider sync way to get result
                     Message message = await _session
                         .DequeueAsync(_cancellationSource.Token)
                         .ConfigureAwait(false);

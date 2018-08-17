@@ -78,7 +78,7 @@ namespace Codestellation.SolarWind.Internals
             return new Connection(networkStream);
         }
 
-        public static async Task<Connection> ConnectTo(Uri remoteUri)
+        public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
         {
             Socket socket = Build.TcpIPv4();
             await socket
@@ -101,7 +101,11 @@ namespace Codestellation.SolarWind.Internals
             //    }
             //}
 
-            return new Connection(networkStream);
+            HandshakeMessage handshakeResponse = await networkStream
+                .HandshakeAsClient(options.HubId)
+                .ConfigureAwait(false);
+            var connection = new Connection(networkStream);
+            onConnected(remoteUri, handshakeResponse.HubId, connection);
         }
     }
 }

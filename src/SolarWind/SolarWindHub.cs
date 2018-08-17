@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
-using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind
 {
@@ -12,27 +11,38 @@ namespace Codestellation.SolarWind
         private readonly ConcurrentDictionary<ChannelId, Channel> _channels;
         private bool _disposed;
         private readonly Listener _listener;
+        private readonly ConcurrentDictionary<Uri, Channel> _outChannels;
 
         public SolarWindHub(SolarWindHubOptions options)
         {
             _options = options.Clone();
             _channels = new ConcurrentDictionary<ChannelId, Channel>();
-            _listener = new Listener(_options, (hubId, connection) => OnChannelAccepted(hubId, connection));
+            _outChannels = new ConcurrentDictionary<Uri, Channel>();
+
+            _listener = new Listener(_options, (hubId, connection) => OnAccepted(hubId, connection));
         }
 
         public void Listen(Uri uri) => _listener.Listen(uri);
 
-        public async Task<Channel> Connect(Uri remoteUri)
+        public Channel Connect(Uri remoteUri)
         {
-            Connection connection = await Connection
-                .ConnectTo(remoteUri)
-                .ConfigureAwait(false);
+            //Someone has already created the channel
+            if (_outChannels.TryGetValue(remoteUri, out Channel result))
+            {
+                return result;
+            }
 
-            HandshakeMessage handshakeResponse = await connection
-                .HandshakeAsClient(_options.HubId)
-                .ConfigureAwait(false);
+            result = new Channel(_options);
+            Channel added = _outChannels.GetOrAdd(remoteUri, result);
+            //Another thread was lucky to add it first. So return his result
+            if (added != result)
+            {
+                return added;
+            }
 
-            return OnChannelAccepted(handshakeResponse.HubId, connection);
+            //Start connection attempts. 
+            Connection.ConnectTo(_options, remoteUri, OnConnected);
+            return result;
         }
 
         public void Dispose()
@@ -42,16 +52,20 @@ namespace Codestellation.SolarWind
             _listener.Dispose();
         }
 
-        private Channel OnChannelAccepted(HubId remoteHubId, Connection connection)
+        private void OnConnected(Uri remoteUri, HubId remoteHubId, Connection connection)
+        {
+            Channel channel = _outChannels[remoteUri];
+            var channelId = new ChannelId(_options.HubId, remoteHubId);
+            _channels.TryAdd(channelId, channel);
+            channel.OnReconnect(connection);
+        }
+
+        private Channel OnAccepted(HubId remoteHubId, Connection connection)
         {
             var channelId = new ChannelId(_options.HubId, remoteHubId);
-            if (_channels.TryGetValue(channelId, out Channel channel) || _channels.TryAdd(channelId, channel = new Channel(_options)))
-            {
-                channel.OnReconnect(connection);
-                return channel;
-            }
-
-            throw new InvalidOperationException("Channel was not open neither reconnected. This should never happen");
+            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(_options));
+            channel.OnReconnect(connection);
+            return channel;
         }
     }
 }

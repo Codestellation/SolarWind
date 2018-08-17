@@ -42,7 +42,7 @@ namespace Codestellation.SolarWind.Tests
             };
 
             _client = new SolarWindHub(_clientOptions);
-            _channelToServer = _client.Connect(_serverUri).Result;
+            _channelToServer = _client.Connect(_serverUri);
 
             _serverReceivedMessage = new ManualResetEvent(false);
             _clientReceivedMessage = new ManualResetEvent(false);
