@@ -7,6 +7,10 @@ namespace Codestellation.SolarWind.Internals
      * Based on ObjectPool<T> from Roslyn source code (with comments reused):
      * https://github.com/dotnet/roslyn/blob/d4dab355b96955aca5b4b0ebf6282575fad78ba8/src/Dependencies/PooledObjects/ObjectPool%601.cs
      */
+    // TODO: I bet it works now so well for high contention environments which also tend to hold objects for a relatively long period of time.
+    // TODO: It also tends to loose 2nd generation objects occasionally, and that's ugly scenario for long-running applications 
+    // TODO: I'm 100% sure it's better to look for other implementations.
+    // TODO: My idea is to make it a fast Stack<T> (without excessive checks) under monitor enter/exit. 
     internal class ObjectPool<T> where T : class
     {
         private T _firstItem;

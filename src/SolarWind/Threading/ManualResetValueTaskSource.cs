@@ -14,11 +14,14 @@ using System.Threading.Tasks.Sources;
 namespace Codestellation.SolarWind.Threading
 {
 // I'd rather know why this was place in such a namespace? Is there any black magic involved?
-    public interface IStrongBox<T>
+    internal interface IStrongBox<T>
     {
         ref T Value { get; }
     }
 
+    /// <summary>
+    /// Different options for <see cref="AwaitableQueue{T}" /> continuations
+    /// </summary>
     public enum ContinuationOptions
     {
         /// <summary>
@@ -36,7 +39,7 @@ namespace Codestellation.SolarWind.Threading
     /// <summary>
     ///     <remarks>This class must be used with an instance per awaiter. So if it's expected to have multiple awaiters simultaneously - use object pool or create new instances</remarks>
     /// </summary>
-    public sealed class AutoResetValueTaskSource<T> : IStrongBox<AutoResetValueTaskSourceLogic<T>>, IValueTaskSource<T>, IValueTaskSource
+    internal sealed class AutoResetValueTaskSource<T> : IStrongBox<AutoResetValueTaskSourceLogic<T>>, IValueTaskSource<T>, IValueTaskSource
     {
         private AutoResetValueTaskSourceLogic<T> _logic; // mutable struct; do not make this readonly
         private readonly Action _cancellationCallback;
@@ -100,7 +103,7 @@ namespace Codestellation.SolarWind.Threading
         }
     }
 
-    public struct AutoResetValueTaskSourceLogic<TResult>
+    internal struct AutoResetValueTaskSourceLogic<TResult>
     {
         private static readonly Action<object> s_sentinel = s => throw new InvalidOperationException();
 

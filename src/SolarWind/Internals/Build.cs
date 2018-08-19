@@ -1,26 +1,16 @@
-using System.Net;
 using System.Net.Sockets;
 
 namespace Codestellation.SolarWind.Internals
 {
+    /// <summary>
+    /// Contains some builder methods to simplify socket creation
+    /// </summary>
     public static class Build
     {
+        /// <summary>
+        /// Creates an instance of <see cref="Socket" /> class initialized for usage in TCP/IP v4 networks
+        /// </summary>
+        /// <returns></returns>
         public static Socket TcpIPv4() => new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-        public static Socket UdpServer(IPEndPoint endpoint = null)
-        {
-            var result = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            result.Bind(endpoint ?? new IPEndPoint(IPAddress.Loopback, 0));
-            return result;
-        }
-
-        public static Socket UdpClientFor(EndPoint endpoint)
-        {
-            var result = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            result.Connect(endpoint);
-            return result;
-        }
-
-        public static Socket UdpClientFor(Socket server) => UdpClientFor(server.LocalEndPoint);
     }
 }

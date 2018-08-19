@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 namespace Codestellation.SolarWind.Internals
 {
+    //TODO: Made it internal to avoid exposing it for users
     public class PooledMemoryStream : Stream
     {
         private static readonly ObjectPool<PooledMemoryStream> Pool = new ObjectPool<PooledMemoryStream>(() => new PooledMemoryStream(), 1024);
