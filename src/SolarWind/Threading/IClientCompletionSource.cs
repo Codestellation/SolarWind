@@ -1,6 +1,8 @@
+using System;
+
 namespace Codestellation.SolarWind.Threading
 {
-    internal interface ISolarWindCompletionSource
+    internal interface IClientCompletionSource
     {
         void SetGenericResult(object data);
     }

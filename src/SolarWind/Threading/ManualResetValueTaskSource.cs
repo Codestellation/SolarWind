@@ -39,7 +39,7 @@ namespace Codestellation.SolarWind.Threading
     /// <summary>
     ///     <remarks>This class must be used with an instance per awaiter. So if it's expected to have multiple awaiters simultaneously - use object pool or create new instances</remarks>
     /// </summary>
-    internal sealed class AutoResetValueTaskSource<T> : IStrongBox<AutoResetValueTaskSourceLogic<T>>, IValueTaskSource<T>, IValueTaskSource
+    internal class AutoResetValueTaskSource<T> : IStrongBox<AutoResetValueTaskSourceLogic<T>>, IValueTaskSource<T>, IValueTaskSource
     {
         private AutoResetValueTaskSourceLogic<T> _logic; // mutable struct; do not make this readonly
         private readonly Action _cancellationCallback;
@@ -101,6 +101,8 @@ namespace Codestellation.SolarWind.Threading
                 : cancellation.Register(_cancellationCallback);
             return _logic.AwaitVoid(this, registration);
         }
+
+        public void Reset() => _logic.Reset();
     }
 
     internal struct AutoResetValueTaskSourceLogic<TResult>
@@ -174,7 +176,7 @@ namespace Codestellation.SolarWind.Threading
             return result;
         }
 
-        private void Reset()
+        public void Reset()
         {
             Version++;
 
@@ -189,6 +191,12 @@ namespace Codestellation.SolarWind.Threading
             _capturedContext = null;
             IsBeingAwaited = false;
             _registration = null;
+
+            if (_parent is IDisposable disposable)
+            {
+                //That's for client completion source
+                disposable.Dispose();
+            }
         }
 
         public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
