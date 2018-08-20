@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using Codestellation.SolarWind.Protocol;
 using Newtonsoft.Json;
 
 namespace Codestellation.SolarWind.Tests
@@ -23,7 +24,7 @@ namespace Codestellation.SolarWind.Tests
             return new MessageTypeId(1);
         }
 
-        public object Deserialize(MessageTypeId typeId, Stream stream)
+        public object Deserialize(in MessageHeader header, Stream stream)
         {
             using (var reader = new JsonTextReader(new StreamReader(stream)) {CloseInput = false})
             {

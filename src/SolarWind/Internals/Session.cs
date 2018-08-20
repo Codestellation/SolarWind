@@ -84,7 +84,7 @@ namespace Codestellation.SolarWind.Internals
                 Message incoming;
                 using (incoming = await _incomingQueue.Await(_disposal.Token).ConfigureAwait(false))
                 {
-                    data = _serializer.Deserialize(incoming.Header.TypeId, incoming.Payload);
+                    data = _serializer.Deserialize(incoming.Header, incoming.Payload);
                 }
 
                 try
