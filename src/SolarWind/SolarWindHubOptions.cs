@@ -6,8 +6,6 @@ namespace Codestellation.SolarWind
 {
     public class SolarWindHubOptions
     {
-        public BeforeChannelAccepted Before { get; }
-        public AfterChannelAccepted After { get; }
         public X509Certificate Certificate { get; set; }
 
         /// <summary>
@@ -15,10 +13,18 @@ namespace Codestellation.SolarWind
         /// </summary>
         public HubId HubId { get; }
 
-        public SolarWindHubOptions(BeforeChannelAccepted before, AfterChannelAccepted after)
+        public SolarWindHubOptions(HubId hubId)
         {
-            Before = before ?? throw new ArgumentNullException(nameof(before));
-            After = after ?? throw new ArgumentNullException(nameof(after));
+            if (hubId == default)
+            {
+                throw new ArgumentException("Must not be the default value", nameof(hubId));
+            }
+
+            HubId = hubId;
+        }
+
+        public SolarWindHubOptions()
+        {
             HubId = new HubId($"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}");
         }
 

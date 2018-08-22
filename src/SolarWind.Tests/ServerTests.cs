@@ -19,7 +19,6 @@ namespace Codestellation.SolarWind.Tests
             public AsyncNetworkStream Stream => _stream ?? (_stream = new AsyncNetworkStream(Client));
         }
 
-
         private SolarWindHub _hub;
         private Uri _uri;
         private MemoryStream _messageBuffer;
@@ -30,11 +29,11 @@ namespace Codestellation.SolarWind.Tests
         public void Setup()
         {
             _serializer = new JsonNetSerializer();
-            var options = new SolarWindHubOptions(_ => new ChannelOptions(_serializer, OnCallback), (_, __) => { });
+            var options = new SolarWindHubOptions();
 
             _hub = new SolarWindHub(options);
             _uri = new Uri("tcp://localhost:4312");
-            _hub.Listen(_uri);
+            _hub.Listen(new ServerOptions(_uri, _ => new ChannelOptions(_serializer, OnCallback), delegate { }));
 
 
             var header = new MessageHeader(new MessageTypeId(1), MessageId.Empty, MessageId.Empty);
@@ -106,7 +105,7 @@ namespace Codestellation.SolarWind.Tests
         private static void AssertReceived(TcpClient client)
         {
             var expectedBytes = 87;
-            var left = expectedBytes;
+            int left = expectedBytes;
             var buffer = new byte[512];
             var received = 0;
             do

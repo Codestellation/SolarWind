@@ -1,36 +1,33 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 
 namespace Codestellation.SolarWind.Internals
 {
     internal class Listener : IDisposable
     {
-        private readonly SolarWindHubOptions _options;
-        private readonly Action<HubId, Connection> _onAccepted;
+        private readonly HubId _hubId;
         private readonly Socket _listener;
         private bool _disposed;
         private readonly SocketAsyncEventArgs _args;
 
-        public Listener(SolarWindHubOptions options, Action<HubId, Connection> onAccepted)
+        public Listener(HubId hubId)
         {
-            _options = options;
-            _onAccepted = onAccepted;
+            _hubId = hubId;
             _listener = Build.TcpIPv4();
             _args = new SocketAsyncEventArgs();
-            _args.Completed += OnAccept;
         }
 
-        public void Listen(Uri uri)
+        public void Listen(Uri uri, Action<HubId, Connection> onAccepted)
         {
             IPEndPoint endpoint = uri.ResolveLocalEndpoint();
             _listener.Bind(endpoint);
             _listener.Listen(10);
-            Task.Run(Listen);
+            _args.Completed += (sender, e) => OnSocketAccepted(e, onAccepted);
+            Listen(onAccepted);
         }
 
-        private void Listen()
+        private void Listen(Action<HubId, Connection> onAccepted)
         {
             if (_disposed)
             {
@@ -40,10 +37,11 @@ namespace Codestellation.SolarWind.Internals
             try
             {
                 _args.AcceptSocket = null;
+
                 if (!_listener.AcceptAsync(_args))
                 {
                     //Completed synchronously
-                    OnAccept(null, _args);
+                    OnSocketAccepted(_args, onAccepted);
                 }
             }
             catch (Exception e)
@@ -55,12 +53,12 @@ namespace Codestellation.SolarWind.Internals
             //Operation started asynchronously, so exit now and wait for OnAccept callback 
         }
 
-        private async void OnAccept(object sender, SocketAsyncEventArgs e)
+        private async void OnSocketAccepted(SocketAsyncEventArgs e, Action<HubId, Connection> onAccepted)
         {
             if (e.SocketError == SocketError.Success)
             {
                 await Connection
-                    .Accept(_options, _args.AcceptSocket, _onAccepted)
+                    .Accept(_hubId, _args.AcceptSocket, onAccepted)
                     .ConfigureAwait(false);
             }
             else
@@ -70,7 +68,7 @@ namespace Codestellation.SolarWind.Internals
             }
 
             //Enter next accept cycle
-            Listen();
+            Listen(onAccepted);
         }
 
 

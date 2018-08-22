@@ -25,12 +25,12 @@ namespace Codestellation.SolarWind.Tests
 
             var jsonNetSerializer = new JsonNetSerializer();
 
-            var solarWindHubOptions = new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, OnServerCallback), delegate { });
+            var solarWindHubOptions = new SolarWindHubOptions();
             _server = new SolarWindHub(solarWindHubOptions);
 
-            _server.Listen(_serverUri);
+            _server.Listen(new ServerOptions(_serverUri, _ => new ChannelOptions(jsonNetSerializer, OnServerCallback), delegate { }));
 
-            var clientOptions = new SolarWindHubOptions(_ => new ChannelOptions(jsonNetSerializer, delegate { }), delegate { });
+            var clientOptions = new SolarWindHubOptions();
             _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, OnClientCallback));
 

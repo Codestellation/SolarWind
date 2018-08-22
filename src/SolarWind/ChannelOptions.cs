@@ -4,8 +4,14 @@ namespace Codestellation.SolarWind
 {
     public class ChannelOptions
     {
+        private static readonly SolarWindCallback EmptyCallback = delegate { };
         public ISerializer Serializer { get; }
         public SolarWindCallback Callback { get; }
+
+
+        public ChannelOptions(ISerializer serializer) : this(serializer, EmptyCallback)
+        {
+        }
 
         public ChannelOptions(ISerializer serializer, SolarWindCallback callback)
         {

@@ -19,10 +19,18 @@ namespace Codestellation.SolarWind
             _channels = new ConcurrentDictionary<ChannelId, Channel>();
             _outChannels = new ConcurrentDictionary<Uri, Channel>();
 
-            _listener = new Listener(_hubOptions, (hubId, connection) => OnAccepted(hubId, connection));
+            _listener = new Listener(_hubOptions.HubId);
         }
 
-        public void Listen(Uri uri) => _listener.Listen(uri);
+        public void Listen(ServerOptions serverOptions)
+        {
+            if (serverOptions == null)
+            {
+                throw new ArgumentNullException(nameof(serverOptions));
+            }
+
+            _listener.Listen(serverOptions.Uri, (remote, connection) => OnAccepted(remote, connection, serverOptions.Before, serverOptions.After));
+        }
 
         public Channel OpenChannelTo(Uri remoteUri, ChannelOptions options)
         {
@@ -33,7 +41,7 @@ namespace Codestellation.SolarWind
 
             if (options == null)
             {
-                throw new ArgumentNullException();
+                throw new ArgumentNullException(nameof(options));
             }
 
             //Someone has already created the channel
@@ -70,15 +78,14 @@ namespace Codestellation.SolarWind
             channel.OnReconnect(connection);
         }
 
-        private Channel OnAccepted(HubId remoteHubId, Connection connection)
+        private void OnAccepted(HubId remoteHubId, Connection connection, BeforeChannelAccepted before, AfterChannelAccepted after)
         {
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
 
-            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(_hubOptions.Before(id.Remote)));
-            _hubOptions.After(channelId, channel);
+            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote)));
+            after(channelId, channel);
 
             channel.OnReconnect(connection);
-            return channel;
         }
     }
 }

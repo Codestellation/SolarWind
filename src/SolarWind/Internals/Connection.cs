@@ -55,7 +55,7 @@ namespace Codestellation.SolarWind.Internals
             await message.Payload.CopyIntoAsync(Stream, cancellation);
         }
 
-        public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
+        public static async Task Accept(HubId serverHubId, Socket socket, Action<HubId, Connection> onAccepted)
         {
             ConfigureSocket(socket);
             var networkStream = new AsyncNetworkStream(socket);
@@ -77,7 +77,7 @@ namespace Codestellation.SolarWind.Internals
 
 
             HandshakeMessage incoming = await networkStream
-                .HandshakeAsServer(options.HubId)
+                .HandshakeAsServer(serverHubId)
                 .ConfigureAwait(false);
             var connection = new Connection(networkStream);
             onAccepted(incoming.HubId, connection);
