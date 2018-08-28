@@ -3,10 +3,11 @@ using System;
 namespace Codestellation.SolarWind
 {
     /// <summary>
-    /// Identifies a <see cref="SolarWindHub"/> instance.  
+    /// Identifies a <see cref="SolarWindHub" /> instance.
     /// </summary>
-    public struct HubId : IEquatable<HubId>
+    public readonly struct HubId : IEquatable<HubId>
     {
+        public static readonly HubId Empty = default;
         public string Id { get; }
 
         public HubId(string id)
@@ -28,6 +29,7 @@ namespace Codestellation.SolarWind
         public static bool operator ==(HubId left, HubId right) => left.Equals(right);
 
         public static bool operator !=(HubId left, HubId right) => !left.Equals(right);
+
         /// <inheritdoc />
         public override string ToString() => Id;
     }

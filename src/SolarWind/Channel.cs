@@ -20,6 +20,9 @@ namespace Codestellation.SolarWind
         private readonly Session _session;
         private SolarWindCallback _callback;
 
+
+        public HubId RemoteHubId { get; internal set; }
+
         public Channel(ChannelOptions options)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));

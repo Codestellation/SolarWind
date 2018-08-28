@@ -20,6 +20,8 @@ namespace Codestellation.SolarWind
             _value = value;
         }
 
+        public bool IsEmpty => this == Empty;
+
         /// <inheritdoc />
         public bool Equals(MessageId other) => _value == other._value;
 

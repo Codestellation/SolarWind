@@ -12,12 +12,16 @@ namespace Codestellation.SolarWind
         private bool _disposed;
         private readonly Listener _listener;
         private readonly ConcurrentDictionary<Uri, Channel> _outChannels;
+        private ConcurrentDictionary<HubId, Channel> _inChannels;
+        private ConcurrentDictionary<HubId, Channel> _remoteIndex;
 
         public SolarWindHub(SolarWindHubOptions options)
         {
             _hubOptions = options.Clone();
             _channels = new ConcurrentDictionary<ChannelId, Channel>();
             _outChannels = new ConcurrentDictionary<Uri, Channel>();
+
+            _remoteIndex = new ConcurrentDictionary<HubId, Channel>();
 
             _listener = new Listener(_hubOptions.HubId);
         }
@@ -63,6 +67,8 @@ namespace Codestellation.SolarWind
             return result;
         }
 
+        public bool TryGetChannel(HubId hubId, out Channel channel) => _remoteIndex.TryGetValue(hubId, out channel);
+
         public void Dispose()
         {
             _disposed = true;
@@ -73,6 +79,7 @@ namespace Codestellation.SolarWind
         private void OnConnected(Uri remoteUri, HubId remoteHubId, Connection connection)
         {
             Channel channel = _outChannels[remoteUri];
+            channel.RemoteHubId = remoteHubId;
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
             _channels.TryAdd(channelId, channel);
             channel.OnReconnect(connection);
@@ -82,7 +89,7 @@ namespace Codestellation.SolarWind
         {
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
 
-            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote)));
+            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote)) {RemoteHubId = remoteHubId});
             after(channelId, channel);
 
             channel.OnReconnect(connection);

@@ -46,6 +46,18 @@ namespace Codestellation.SolarWind
 
         public static bool operator !=(MessageTypeId left, MessageTypeId right) => !left.Equals(right);
 
+        public static explicit operator int(MessageTypeId typeId) => typeId._id;
+
+        public static explicit operator uint(MessageTypeId typeId) => (uint)typeId._id;
+
+        public static explicit operator long(MessageTypeId typeId) => typeId._id;
+
+        public static explicit operator ulong(MessageTypeId typeId) => (ulong)typeId._id;
+
+        public static explicit operator short(MessageTypeId typeId) => (short)typeId._id;
+
+        public static explicit operator ushort(MessageTypeId typeId) => (ushort)typeId._id;
+
         /// <inheritdoc />
         public override string ToString() => _id.ToString(CultureInfo.InvariantCulture);
     }
