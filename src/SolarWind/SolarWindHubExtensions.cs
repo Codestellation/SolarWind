@@ -9,6 +9,7 @@ namespace Codestellation.SolarWind
             if (hub.TryGetChannel(remoteHubId, out Channel channel))
             {
                 channel.Post(message, messageId);
+                return;
             }
 
             throw new InvalidOperationException($"Channel to '{remoteHubId}' was not found.");

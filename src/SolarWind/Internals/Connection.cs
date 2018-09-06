@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Net.Security;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,7 +24,7 @@ namespace Codestellation.SolarWind.Internals
 
         public async ValueTask Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            var left = bytesToReceive;
+            int left = bytesToReceive;
 
             while (left != 0)
             {
@@ -87,9 +86,23 @@ namespace Codestellation.SolarWind.Internals
         {
             Socket socket = Build.TcpIPv4();
             ConfigureSocket(socket);
-            await socket
-                .ConnectAsync(remoteUri.ResolveRemoteEndpoint())
-                .ConfigureAwait(false);
+
+            while (true)
+            {
+                try
+                {
+                    await socket
+                        .ConnectAsync(remoteUri.ResolveRemoteEndpoint())
+                        .ConfigureAwait(false);
+                    break;
+                }
+                catch (SocketException e)
+                {
+                    Console.WriteLine(e.Message);
+                    await Task.Delay(5000).ConfigureAwait(false);
+                }
+            }
+
 
             var networkStream = new AsyncNetworkStream(socket);
             //SslStream sslStream = null;

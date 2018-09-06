@@ -13,7 +13,7 @@ namespace Codestellation.SolarWind
         private readonly Listener _listener;
         private readonly ConcurrentDictionary<Uri, Channel> _outChannels;
         private ConcurrentDictionary<HubId, Channel> _inChannels;
-        private ConcurrentDictionary<HubId, Channel> _remoteIndex;
+        private readonly ConcurrentDictionary<HubId, Channel> _remoteIndex;
 
         public SolarWindHub(SolarWindHubOptions options)
         {
@@ -82,6 +82,7 @@ namespace Codestellation.SolarWind
             channel.RemoteHubId = remoteHubId;
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
             _channels.TryAdd(channelId, channel);
+            _remoteIndex.TryAdd(remoteHubId, channel);
             channel.OnReconnect(connection);
         }
 
@@ -90,6 +91,7 @@ namespace Codestellation.SolarWind
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
 
             Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote)) {RemoteHubId = remoteHubId});
+            _remoteIndex.TryAdd(remoteHubId, channel);
             after(channelId, channel);
 
             channel.OnReconnect(connection);
