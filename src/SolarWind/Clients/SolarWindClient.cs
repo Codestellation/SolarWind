@@ -28,20 +28,17 @@ namespace Codestellation.SolarWind.Clients
         public ValueTask<TResponse> SendAsync<TRequest, TResponse>(TRequest request)
         {
             MessageId id = _channel.Post(request);
-            ClientCompletionSource<TResponse> source = ClientCompletionSource<TResponse>.Rent(id);
-            object result = _requestRegistry.GetOrAdd(id, msgId => source);
+            object result = _requestRegistry.GetOrAdd(id, msgId => new SolarWindCompletionSource<TResponse>());
             //It's highly unlikely but possible that response will come before adding completion source in the dictionary
             // In such a case return the value immediately
             if (result is TResponse response)
             {
                 _requestRegistry.TryRemove(id, out _); //Simply remove the value from the dictionary
-                source.Dispose(); // Returns source to the pool
                 return new ValueTask<TResponse>(response);
             }
 
-            //TODO: Use pooled value task completion source to avoid excessive allocations
-
-            return new ValueTask<TResponse>(source, source.Version);
+            var completionSource = (TaskCompletionSource<TResponse>)result;
+            return new ValueTask<TResponse>(completionSource.Task);
         }
 
         public void NotifyAsync<TNotification>(TNotification notification) => _channel.Post(notification);

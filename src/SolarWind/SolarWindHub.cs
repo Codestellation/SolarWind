@@ -72,8 +72,9 @@ namespace Codestellation.SolarWind
         public void Dispose()
         {
             _disposed = true;
-            Parallel.ForEach(_channels, c => c.Value.Dispose());
             _listener.Dispose();
+            Parallel.ForEach(_channels, c => c.Value.Dispose());
+            
         }
 
         private void OnConnected(Uri remoteUri, HubId remoteHubId, Connection connection)
