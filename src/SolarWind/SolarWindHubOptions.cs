@@ -1,11 +1,14 @@
 using System;
-using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Codestellation.SolarWind
 {
     public class SolarWindHubOptions
     {
+        public ILoggerFactory LoggerFactory { get; }
+
         public X509Certificate Certificate { get; set; }
 
         /// <summary>
@@ -13,7 +16,7 @@ namespace Codestellation.SolarWind
         /// </summary>
         public HubId HubId { get; }
 
-        public SolarWindHubOptions(HubId hubId)
+        public SolarWindHubOptions(HubId hubId, ILoggerFactory loggerFactory)
         {
             if (hubId == default)
             {
@@ -21,14 +24,14 @@ namespace Codestellation.SolarWind
             }
 
             HubId = hubId;
+            LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
         }
 
-        public SolarWindHubOptions()
+        public SolarWindHubOptions(ILoggerFactory loggerFactory)
+            : this(HubId.Generate(), loggerFactory)
         {
-            HubId = new HubId($"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}");
         }
 
-
-        public SolarWindHubOptions Clone() => (SolarWindHubOptions)MemberwiseClone();
+        internal SolarWindHubOptions Clone() => (SolarWindHubOptions)MemberwiseClone();
     }
 }

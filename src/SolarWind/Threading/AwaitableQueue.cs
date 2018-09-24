@@ -52,5 +52,21 @@ namespace Codestellation.SolarWind.Threading
                 return _queue.TryDequeue(out T result) ? new ValueTask<T>(result) : _source.AwaitValue(cancellation);
             }
         }
+
+        public void Dispose(Action<T> onDispose)
+        {
+            if (onDispose == null)
+            {
+                throw new ArgumentNullException(nameof(onDispose));
+            }
+
+            lock (_queue)
+            {
+                while (_queue.TryDequeue(out T result))
+                {
+                    onDispose(result);
+                }
+            }
+        }
     }
 }

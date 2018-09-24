@@ -1,21 +1,25 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
 {
     internal class Listener : IDisposable
     {
-        private readonly HubId _hubId;
+        private readonly SolarWindHubOptions _hubOptions;
         private readonly Socket _listener;
         private bool _disposed;
         private readonly SocketAsyncEventArgs _args;
+        private readonly ILogger<Listener> _logger;
 
-        public Listener(HubId hubId)
+        public Listener(SolarWindHubOptions hubOptions)
         {
-            _hubId = hubId;
+            _hubOptions = hubOptions;
             _listener = Build.TcpIPv4();
             _args = new SocketAsyncEventArgs();
+
+            _logger = hubOptions.LoggerFactory.CreateLogger<Listener>();
         }
 
         public void Listen(Uri uri, Action<HubId, Connection> onAccepted)
@@ -46,7 +50,10 @@ namespace Codestellation.SolarWind.Internals
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                if (_logger.IsEnabled(LogLevel.Error))
+                {
+                    _logger.LogError(e, "Failed to start listening");
+                }
             }
 
 
@@ -55,16 +62,28 @@ namespace Codestellation.SolarWind.Internals
 
         private async void OnSocketAccepted(SocketAsyncEventArgs e, Action<HubId, Connection> onAccepted)
         {
-            if (e.SocketError == SocketError.Success)
+            if (e.SocketError != SocketError.Success)
             {
-                await Connection
-                    .Accept(_hubId, _args.AcceptSocket, onAccepted)
-                    .ConfigureAwait(false);
+                if (_logger.IsEnabled(LogLevel.Error))
+                {
+                    _logger.LogError($"Error accepting socket. Exception code = {(int)e.SocketError} ({e.SocketError})");
+                }
             }
             else
             {
-                //TODO: Better logging
-                Console.WriteLine(e.SocketError);
+                try
+                {
+                    await Connection
+                        .Accept(_hubOptions.HubId, _args.AcceptSocket, _hubOptions.LoggerFactory.CreateLogger<Connection>(), onAccepted)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    if (_logger.IsEnabled(LogLevel.Error))
+                    {
+                        _logger.LogError(ex, "Error accepting connection");
+                    }
+                }
             }
 
             //Enter next accept cycle

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
 using Codestellation.SolarWind.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -24,11 +25,13 @@ namespace Codestellation.SolarWind.Internals
 
         private readonly Task _serialization;
         private readonly Task _deserialization;
+        private readonly ILogger _logger;
 
-        public Session(ISerializer serializer, DeserializationCallback callback)
+        public Session(ISerializer serializer, DeserializationCallback callback, ILogger logger)
         {
             _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             _callback = callback ?? throw new ArgumentNullException(nameof(callback));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
             _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ForceDefaultTaskScheduler);
@@ -65,11 +68,13 @@ namespace Codestellation.SolarWind.Internals
                     PooledMemoryStream.ResetAndReturn(payload);
                     break;
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
                     PooledMemoryStream.ResetAndReturn(payload);
-                    //TODO: Better logging
-                    Console.WriteLine(e);
+                    if (_logger.IsEnabled(LogLevel.Error))
+                    {
+                        _logger.LogError(ex, "Serialization failure.");
+                    }
                 }
             }
         }
@@ -80,21 +85,46 @@ namespace Codestellation.SolarWind.Internals
             //TODO: Implement graceful shutdown
             while (!_disposal.IsCancellationRequested)
             {
-                object data;
-                Message incoming;
-                using (incoming = await _incomingQueue.Await(_disposal.Token).ConfigureAwait(false))
+                Message incoming = default;
+                try
                 {
-                    data = _serializer.Deserialize(incoming.Header, incoming.Payload);
+                    incoming = await _incomingQueue.Await(_disposal.Token).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    if(_logger.IsEnabled(LogLevel.Error))
+                    {
+                        _logger.LogError(ex, "Failed to dequeue a message");
+                    }
+                    continue;
                 }
 
+                object data;
+                try
+                {
+                    data = _serializer.Deserialize(incoming.Header, incoming.Payload);
+                    incoming.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    if (_logger.IsEnabled(LogLevel.Error))
+                    {
+                        _logger.LogError(ex, $"Deserialization failure. {incoming.Header.ToString()}");
+                    }
+                    incoming.Dispose();
+                    continue;
+                }
+                
                 try
                 {
                     _callback(incoming.Header, data);
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    //TODO: Use better logging
-                    Console.WriteLine(e);
+                    if (_logger.IsEnabled(LogLevel.Error))
+                    {
+                        _logger.LogError(ex, $"Failure during callback. {incoming.Header.ToString()}");
+                    }
                 }
             }
         }
@@ -118,7 +148,9 @@ namespace Codestellation.SolarWind.Internals
 
         public void Dispose()
         {
-            //TODO: Think how to dispose it in a correct manner
+            _incomingQueue.Dispose(m => m.Dispose());
+            _outgoingQueue.Dispose(m => m.Dispose());
+            _serializationQueue.Dispose(m => { });
         }
     }
 }

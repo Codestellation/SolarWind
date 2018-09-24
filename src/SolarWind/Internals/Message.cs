@@ -16,8 +16,6 @@ namespace Codestellation.SolarWind.Internals
             Payload = payload ?? throw new ArgumentNullException(nameof(payload));
         }
 
-        public bool IsEmpty => Equals(default);
-
         public void Dispose()
         {
             if (Payload != null)

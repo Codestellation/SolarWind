@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Threading;
 using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 using Newtonsoft.Json;
 using NUnit.Framework;
 
@@ -25,12 +27,12 @@ namespace Codestellation.SolarWind.Tests
 
             var jsonNetSerializer = new JsonNetSerializer();
 
-            var solarWindHubOptions = new SolarWindHubOptions();
+            var solarWindHubOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
             _server = new SolarWindHub(solarWindHubOptions);
 
             _server.Listen(new ServerOptions(_serverUri, _ => new ChannelOptions(jsonNetSerializer, OnServerCallback), delegate { }));
 
-            var clientOptions = new SolarWindHubOptions();
+            var clientOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
             _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, OnClientCallback));
 

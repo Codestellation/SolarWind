@@ -29,7 +29,7 @@ namespace Codestellation.SolarWind.Tests
         public void Setup()
         {
             _serializer = new JsonNetSerializer();
-            var options = new SolarWindHubOptions();
+            var options = new SolarWindHubOptions(TestContext.LoggerFactory);
 
             _hub = new SolarWindHub(options);
             _uri = new Uri("tcp://localhost:4312");

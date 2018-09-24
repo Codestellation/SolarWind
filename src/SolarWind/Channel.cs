@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind
 {
@@ -19,14 +20,22 @@ namespace Codestellation.SolarWind
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
         private SolarWindCallback _callback;
+        private ILogger<Channel> _logger;
 
 
         public HubId RemoteHubId { get; internal set; }
 
-        public Channel(ChannelOptions options)
+        public Channel(ChannelOptions options, ILoggerFactory factory)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
-            _session = new Session(options.Serializer, OnIncomingMessage);
+
+            if (factory == null)
+            {
+                throw new ArgumentNullException(nameof(factory));
+            }
+
+            _logger = factory.CreateLogger<Channel>();
+            _session = new Session(options.Serializer, OnIncomingMessage, factory.CreateLogger<Session>());
         }
 
         internal void OnReconnect(Connection connection)
@@ -79,11 +88,14 @@ namespace Codestellation.SolarWind
                 await Receive(buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
                 message = new Message(wireHeader.MessageHeader, buffer);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                if (!(e is OperationCanceledException))
+                if (!(ex is OperationCanceledException))
                 {
-                    Console.WriteLine(e);
+                    if (_logger.IsEnabled(LogLevel.Error))
+                    {
+                        _logger.LogError(ex, "Error during receive");
+                    }
                 }
 
                 PooledMemoryStream.ResetAndReturn(buffer);
@@ -99,10 +111,12 @@ namespace Codestellation.SolarWind
             {
                 (_callback ?? _options.Callback).Invoke(this, header, data);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                //TODO: Log exceptions
-                Console.WriteLine(e);
+                if (_logger.IsEnabled(LogLevel.Error))
+                {
+                    _logger.LogError(ex, $"Error during callback. {header.ToString()}");
+                }
             }
         }
 

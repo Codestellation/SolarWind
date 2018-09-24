@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 
 namespace Codestellation.SolarWind
 {
@@ -32,5 +33,7 @@ namespace Codestellation.SolarWind
 
         /// <inheritdoc />
         public override string ToString() => Id;
+
+        public static HubId Generate() => new HubId($"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}");    
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Codestellation.SolarWind
 {
@@ -41,5 +42,8 @@ namespace Codestellation.SolarWind
         /// <remarks>This method is not thread safe</remarks>
         /// <returns></returns>
         public MessageId Next() => new MessageId(_value + 1);
+
+        /// <inheritdoc />
+        public override string ToString() => _value.ToString(CultureInfo.InvariantCulture);
     }
 }

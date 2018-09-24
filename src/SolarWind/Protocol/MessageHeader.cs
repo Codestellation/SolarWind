@@ -17,10 +17,12 @@ namespace Codestellation.SolarWind.Protocol
             ReplyTo = replyTo;
         }
 
+        /// <inheritdoc />
         public bool Equals(MessageHeader other) => TypeId.Equals(other.TypeId) && MessageId.Equals(other.MessageId);
 
         public override bool Equals(object obj) => obj is MessageHeader header && Equals(header);
 
+        /// <inheritdoc />
         public override int GetHashCode()
         {
             unchecked
@@ -32,5 +34,8 @@ namespace Codestellation.SolarWind.Protocol
         public static bool operator ==(MessageHeader left, MessageHeader right) => left.Equals(right);
 
         public static bool operator !=(MessageHeader left, MessageHeader right) => !left.Equals(right);
+
+        /// <inheritdoc />
+        public override string ToString() => $"TypeId={TypeId.ToString()}; MsgId={MessageId.ToString()}";
     }
 }

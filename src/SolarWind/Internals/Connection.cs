@@ -4,21 +4,24 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
 {
     internal class Connection
     {
         private readonly AsyncNetworkStream _networkStream;
+        private readonly ILogger _logger;
 
         /// <summary>
         /// Could be either <see cref="NetworkStream" /> or <see cref="SslStream" />
         /// </summary>
         public AsyncNetworkStream Stream { get; }
 
-        private Connection(AsyncNetworkStream networkStream)
+        private Connection(AsyncNetworkStream networkStream, ILogger logger)
         {
-            _networkStream = networkStream;
+            _networkStream = networkStream ?? throw new ArgumentNullException(nameof(networkStream));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             Stream = _networkStream;
         }
 
@@ -54,7 +57,7 @@ namespace Codestellation.SolarWind.Internals
             await message.Payload.CopyIntoAsync(Stream, cancellation);
         }
 
-        public static async Task Accept(HubId serverHubId, Socket socket, Action<HubId, Connection> onAccepted)
+        public static async Task Accept(HubId serverHubId, Socket socket, ILogger logger, Action<HubId, Connection> onAccepted)
         {
             ConfigureSocket(socket);
             var networkStream = new AsyncNetworkStream(socket);
@@ -78,11 +81,11 @@ namespace Codestellation.SolarWind.Internals
             HandshakeMessage incoming = await networkStream
                 .HandshakeAsServer(serverHubId)
                 .ConfigureAwait(false);
-            var connection = new Connection(networkStream);
+            var connection = new Connection(networkStream, logger);
             onAccepted(incoming.HubId, connection);
         }
 
-        public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
+        public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, ILogger logger, Action<Uri, HubId, Connection> onConnected)
         {
             Socket socket = Build.TcpIPv4();
             ConfigureSocket(socket);
@@ -98,7 +101,11 @@ namespace Codestellation.SolarWind.Internals
                 }
                 catch (SocketException e)
                 {
-                    Console.WriteLine(e.Message);
+                    if (logger.IsEnabled(LogLevel.Trace))
+                    {
+                        logger.LogTrace(e, $"Cannot connect to '{remoteUri}");
+                    }
+
                     await Task.Delay(5000).ConfigureAwait(false);
                 }
             }
@@ -123,7 +130,7 @@ namespace Codestellation.SolarWind.Internals
             HandshakeMessage handshakeResponse = await networkStream
                 .HandshakeAsClient(options.HubId)
                 .ConfigureAwait(false);
-            var connection = new Connection(networkStream);
+            var connection = new Connection(networkStream, logger);
             onConnected(remoteUri, handshakeResponse.HubId, connection);
         }
 

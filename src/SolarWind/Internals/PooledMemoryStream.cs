@@ -21,17 +21,17 @@ namespace Codestellation.SolarWind.Internals
             return pooledMemoryStream;
         }
 
-        public static void Return(PooledMemoryStream stream)
-        {
-            stream.Reset();
-            Pool.Return(stream);
-        }
-
         public static void ResetAndReturn(PooledMemoryStream stream)
         {
             stream.CompleteWrite();
             stream.CompleteRead();
             Return(stream);
+        }
+
+        public static void Return(PooledMemoryStream stream)
+        {
+            stream.Reset();
+            Pool.Return(stream);
         }
 
         public void Reset()

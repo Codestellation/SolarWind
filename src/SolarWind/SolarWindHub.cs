@@ -23,7 +23,7 @@ namespace Codestellation.SolarWind
 
             _remoteIndex = new ConcurrentDictionary<HubId, Channel>();
 
-            _listener = new Listener(_hubOptions.HubId);
+            _listener = new Listener(_hubOptions);
         }
 
         public void Listen(ServerOptions serverOptions)
@@ -54,7 +54,7 @@ namespace Codestellation.SolarWind
                 return result;
             }
 
-            result = new Channel(options);
+            result = new Channel(options, _hubOptions.LoggerFactory);
             Channel added = _outChannels.GetOrAdd(remoteUri, result);
             //Another thread was lucky to add it first. So return his result
             if (added != result)
@@ -63,7 +63,7 @@ namespace Codestellation.SolarWind
             }
 
             //Start connection attempts. 
-            Connection.ConnectTo(_hubOptions, remoteUri, OnConnected);
+            Connection.ConnectTo(_hubOptions, remoteUri, _hubOptions.LoggerFactory.CreateLogger(nameof(Connection)), OnConnected);
             return result;
         }
 
@@ -90,7 +90,7 @@ namespace Codestellation.SolarWind
         {
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
 
-            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote)) {RemoteHubId = remoteHubId});
+            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote), _hubOptions.LoggerFactory) {RemoteHubId = remoteHubId});
             _remoteIndex.TryAdd(remoteHubId, channel);
             after(channelId, channel);
 
