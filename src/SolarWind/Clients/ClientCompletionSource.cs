@@ -4,7 +4,7 @@ using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind.Clients
 {
-    internal class ClientCompletionSource<TResponse> : AutoResetValueTaskSource<TResponse>, IClientCompletionSource,  IDisposable
+    internal class ClientCompletionSource<TResponse> : AutoResetValueTaskSource<TResponse>, IClientCompletionSource, IDisposable
     {
         private static readonly StackBasedPool<ClientCompletionSource<TResponse>> Pool = new StackBasedPool<ClientCompletionSource<TResponse>>(() => new ClientCompletionSource<TResponse>());
 
@@ -13,11 +13,11 @@ namespace Codestellation.SolarWind.Clients
 
         private ClientCompletionSource()
         {
-
         }
+
         public static ClientCompletionSource<TResponse> Rent(MessageId id)
         {
-            var result = Pool.Rent();
+            ClientCompletionSource<TResponse> result = Pool.Rent();
             result.MessageId = id;
             return result;
         }
@@ -25,6 +25,7 @@ namespace Codestellation.SolarWind.Clients
         public void Dispose()
         {
             MessageId = MessageId.Empty;
+            Reset();
             Pool.Return(this);
         }
 

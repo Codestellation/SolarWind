@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Concurrent;
-using System.ComponentModel.Design.Serialization;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Sources;
-using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using Codestellation.SolarWind.Threading;
 
@@ -16,12 +13,13 @@ namespace Codestellation.SolarWind.Clients
 
         public SolarWindClient(Channel channel)
         {
-           _channel = channel ?? throw new ArgumentNullException(nameof(channel));
+            _channel = channel ?? throw new ArgumentNullException(nameof(channel));
             channel.SetCallback(OnSolarWindCallback);
             _requestRegistry = new ConcurrentDictionary<MessageId, object>();
         }
+
         /// <summary>
-        /// Do not use this method if you don't need a response. In such a case use  <see cref="NotifyAsync{TNotification}"/> method.
+        /// Do not use this method if you don't need a response. In such a case use  <see cref="NotifyAsync{TNotification}" /> method.
         /// </summary>
         /// <param name="request"></param>
         /// <typeparam name="TRequest"></typeparam>
@@ -42,6 +40,7 @@ namespace Codestellation.SolarWind.Clients
             }
 
             //TODO: Use pooled value task completion source to avoid excessive allocations
+
             return new ValueTask<TResponse>(source, source.Version);
         }
 
@@ -58,9 +57,7 @@ namespace Codestellation.SolarWind.Clients
                 //Note: The source is return to pool when GetResult is called during Reset procedure, see AutoResetValueTaskSource
                 _requestRegistry.TryRemove(header.ReplyTo, out _);
                 source.SetGenericResult(data);
-
             }
         }
-
     }
 }

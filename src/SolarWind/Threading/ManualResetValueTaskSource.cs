@@ -191,12 +191,6 @@ namespace Codestellation.SolarWind.Threading
             _capturedContext = null;
             IsBeingAwaited = false;
             _registration = null;
-
-            if (_parent is IDisposable disposable)
-            {
-                //That's for client completion source
-                disposable.Dispose();
-            }
         }
 
         public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
@@ -276,7 +270,7 @@ namespace Codestellation.SolarWind.Threading
         {
             if (_completed)
             {
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("Double completion of completion source is prohibited");
             }
 
             _completed = true;
