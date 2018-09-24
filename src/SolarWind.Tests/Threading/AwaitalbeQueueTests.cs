@@ -91,5 +91,16 @@ namespace Codestellation.SolarWind.Tests.Threading
             //assert
             Assert.ThrowsAsync<TaskCanceledException>(async () => await _queue.Await(source.Token).ConfigureAwait(false));
         }
+
+        [Test]
+        public void Should_not_set_result_for_value_task_multiple_times_during_awaiting_phase()
+        {
+            ValueTask<int> x = _queue.Await(CancellationToken.None);
+
+            for (var i = 0; i < 10_000; i++)
+            {
+                _queue.Enqueue(i);
+            }
+        }
     }
 }

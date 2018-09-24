@@ -20,7 +20,7 @@ namespace Codestellation.SolarWind
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
         private SolarWindCallback _callback;
-        private ILogger<Channel> _logger;
+        private readonly ILogger<Channel> _logger;
 
 
         public HubId RemoteHubId { get; internal set; }
