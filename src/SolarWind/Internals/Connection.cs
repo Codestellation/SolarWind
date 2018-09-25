@@ -143,20 +143,20 @@ namespace Codestellation.SolarWind.Internals
 
         public void Write(in Message message)
         {
-            _logger.LogDebug($"Writing header {message.Header.ToString()}");
+            //_logger.LogDebug($"Writing header {message.Header.ToString()}");
             var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
             byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
 
             WireHeader.WriteTo(wireHeader, buffer);
             Stream.Write(buffer, 0, WireHeader.Size);
-            _logger.LogDebug($"Written header {message.Header.ToString()}");
+            //_logger.LogDebug($"Written header {message.Header.ToString()}");
 
             ArrayPool<byte>.Shared.Return(buffer);
-            _logger.LogDebug($"Writing payload {message.Header.ToString()}");
+            //_logger.LogDebug($"Writing payload {message.Header.ToString()}");
 
             message.Payload.CopyInto(Stream);
 
-            _logger.LogDebug($"Written payload {message.Header.ToString()}");
+            //_logger.LogDebug($"Written payload {message.Header.ToString()}");
         }
     }
 }

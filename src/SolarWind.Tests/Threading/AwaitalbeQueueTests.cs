@@ -60,7 +60,7 @@ namespace Codestellation.SolarWind.Tests.Threading
             //act
             ValueTask<int> actual = _queue.Await(CancellationToken.None);
             Stopwatch sw = Stopwatch.StartNew();
-            int result = await actual.ConfigureAwait(false);
+            var result = await actual.ConfigureAwait(false);
             sw.Stop();
 
 
@@ -100,6 +100,29 @@ namespace Codestellation.SolarWind.Tests.Threading
             for (var i = 0; i < 10_000; i++)
             {
                 _queue.Enqueue(i);
+            }
+        }
+
+
+        [Test]
+        public async Task Should_not_lost_elements()
+        {
+            const int total = 1_000_000;
+            Task.Run(() =>
+            {
+                for (var i = 0; i < total; i++)
+                {
+                    _queue.Enqueue(i);
+                }
+            });
+
+            var expected = 0;
+
+            while (expected < total)
+            {
+                var actual = await _queue.Await(CancellationToken.None).ConfigureAwait(false);
+                actual.Should().Be(expected);
+                expected++;
             }
         }
     }

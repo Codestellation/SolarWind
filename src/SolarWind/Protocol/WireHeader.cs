@@ -6,7 +6,7 @@ namespace Codestellation.SolarWind.Protocol
 {
     //Structure has some reserved space for the future
     [StructLayout(LayoutKind.Sequential, Size = 64)]
-    internal struct WireHeader
+    public struct WireHeader
     {
         public static readonly unsafe int Size = sizeof(WireHeader);
 
@@ -48,6 +48,14 @@ namespace Codestellation.SolarWind.Protocol
             Span<byte> span = stackalloc byte[Size];
             buffer.Read(span);
             fixed (byte* p = span)
+            {
+                return ref *((WireHeader*)p);
+            }
+        }
+
+        public static unsafe ref WireHeader ReadFrom(byte[] buffer)
+        {
+            fixed (byte* p = buffer)
             {
                 return ref *((WireHeader*)p);
             }

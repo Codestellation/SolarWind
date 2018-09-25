@@ -23,7 +23,6 @@ namespace Codestellation.SolarWind
         private SolarWindCallback _callback;
         private readonly ILogger<Channel> _logger;
 
-
         public HubId RemoteHubId { get; internal set; }
 
         public Channel(ChannelOptions options, ILoggerFactory factory)
@@ -44,8 +43,8 @@ namespace Codestellation.SolarWind
             Stop();
             _cancellationSource = new CancellationTokenSource();
             _connection = connection;
-            _reader = StartReadingTask();
-            _writer = StartWritingTask();
+            _reader = Task.Run(() => StartReadingTask());
+            _writer = Task.Run(() => StartWritingTask());
         }
 
         /// <summary>
@@ -64,7 +63,7 @@ namespace Codestellation.SolarWind
         public void SetCallback(SolarWindCallback callback)
             => _callback = callback ?? throw new ArgumentNullException(nameof(callback));
 
-        private async Task StartReadingTask()
+        private async void StartReadingTask()
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
@@ -123,24 +122,23 @@ namespace Codestellation.SolarWind
 
         private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
 
-        private async Task StartWritingTask()
+        private async void StartWritingTask()
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
                 try
                 {
-                    Message message = await _session
-                        .DequeueAsync(_cancellationSource.Token)
-                        .ConfigureAwait(false);
-
-                    _logger.LogDebug($"Writing message {message.Header.ToString()}");
-
-                    using (message)
+                    if (_session.TryDequeueAsync(out Message message))
                     {
-                        _connection.Write(message);
-                        //await _connection
-                        //    .WriteAsync(message, _cancellationSource.Token)
-                        //    .ConfigureAwait(false);
+                        _logger.LogDebug($"Writing message {message.Header.ToString()}");
+
+                        using (message)
+                        {
+                            _connection.Write(message);
+                            //await _connection
+                            //    .WriteAsync(message, _cancellationSource.Token)
+                            //    .ConfigureAwait(false);
+                        }
                     }
                 }
                 catch (OperationCanceledException)

@@ -16,7 +16,7 @@ namespace Codestellation.SolarWind.Tests
 
         public MessageTypeId Serialize(object data, Stream stream)
         {
-            using (var writer = new StreamWriter(stream, Encoding.UTF8, 1024, true))
+            using (var writer = new StreamWriter(stream, Encoding.UTF8, 128, true))
             {
                 _serializer.Serialize(writer, data);
             }
