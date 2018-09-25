@@ -101,6 +101,7 @@ namespace Codestellation.SolarWind.Internals
         public int Read(in Span<byte> buffer) => _memory.Read(buffer);
 
         public void CopyInto(Stream stream) => _memory.CopyTo(stream);
+
         public ValueTask CopyIntoAsync(AsyncNetworkStream stream, CancellationToken cancellation) => _memory.CopyToAsync(stream, cancellation);
 
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();

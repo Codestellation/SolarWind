@@ -75,6 +75,7 @@ namespace Codestellation.SolarWind.Internals
 
                 _sendArgs.SetBuffer(segment.Array, realOffset, left);
 
+
                 if (Socket.SendAsync(_sendArgs))
                 {
                     sent += await _sendSource
@@ -84,10 +85,17 @@ namespace Codestellation.SolarWind.Internals
                 else
                 {
                     //Operation has completed synchronously
-                    sent += _sendArgs.BytesTransferred;
+                    if (_sendArgs.SocketError == SocketError.Success)
+                    {
+                        sent += _sendArgs.BytesTransferred;
+                    }
+                    else
+                    {
+                        throw new SocketException((int)_sendArgs.SocketError);
+                    }
                 }
 
-                left -= sent;
+                left = from.Length - sent;
             }
         }
 

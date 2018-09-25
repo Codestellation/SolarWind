@@ -1,5 +1,9 @@
 using System;
+using System.Diagnostics;
+using System.Globalization;
+using System.Net.Sockets;
 using System.Threading;
+using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
 using NUnit.Framework;
@@ -9,71 +13,57 @@ namespace Codestellation.SolarWind.Tests
     [TestFixture]
     public class StabilityTests
     {
-        private SolarWindHub _server;
         private Uri _serverUri;
         private SolarWindHub _client;
         private Channel _channelToServer;
         private int _count;
-        private int _clientReceived;
+
         private int _serverReceived;
+        private Socket _listener;
 
 
         [SetUp]
         public void Setup()
         {
             _serverUri = new Uri("tcp://localhost:4312");
-
             var jsonNetSerializer = new JsonNetSerializer();
 
-            var solarWindHubOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
-            _server = new SolarWindHub(solarWindHubOptions);
+            _listener = Build.TcpIPv4();
+            StartListener();
+            
 
-            _server.Listen(new ServerOptions(_serverUri, _ => new ChannelOptions(jsonNetSerializer, OnServerCallback), delegate { }));
 
             var clientOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
             _client = new SolarWindHub(clientOptions);
-            _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, OnClientCallback));
+            _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, delegate { }));
 
             _count = 10_000;
-            _clientReceived = 0;
+
             _serverReceived = 0;
         }
 
         [TearDown]
-        public void TearDown()
-        {
-            _server?.Dispose();
-            _client?.Dispose();
-        }
+        public void TearDown() => _client?.Dispose();
 
         [Test]
-        public void PingPong()
+        public void Should_deliver_a_bunch_of_messages_to_server()
         {
+            _channelToServer.Post(new TextMessage {Text = $"Hello {(-1).ToString(CultureInfo.InvariantCulture)}, server !"});
+            Stopwatch watch = Stopwatch.StartNew();
             for (var i = 0; i < _count; i++)
             {
-                _channelToServer.Post(new TextMessage {Text = "Hello, server!"});
+                _channelToServer.Post(new TextMessage {Text = $"Hello {i.ToString(CultureInfo.InvariantCulture)}, server !"});
             }
 
-            Thread.Sleep(10_000);
-            new
-                {
-                    Client = _clientReceived,
-                    Server = _serverReceived
-                }
-                .Should().BeEquivalentTo(
-                    new
-                    {
-                        Client = _count,
-                        Server = _count
-                    });
+            watch.Stop();
+
+            Console.WriteLine($"Pushed all messages in {watch.ElapsedMilliseconds}");
+
+            Thread.Sleep(10000);
+
+            _serverReceived.Should().Be(_count);
         }
 
-        private void OnServerCallback(Channel channel, in MessageHeader messageHeader, object data)
-        {
-            _serverReceived++;
-            channel.Post(new TextMessage {Text = "Hello, client!"});
-        }
-
-        private void OnClientCallback(Channel channel, in MessageHeader messageHeader, object data) => _clientReceived++;
+        private void OnServerCallback(Channel channel, in MessageHeader messageHeader, object data) => _serverReceived++;
     }
 }

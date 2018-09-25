@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -132,16 +133,23 @@ namespace Codestellation.SolarWind
                         .DequeueAsync(_cancellationSource.Token)
                         .ConfigureAwait(false);
 
+                    _logger.LogDebug($"Writing message {message.Header.ToString()}");
+
                     using (message)
                     {
-                        await _connection
-                            .WriteAsync(message, _cancellationSource.Token)
-                            .ConfigureAwait(false);
+                        _connection.Write(message);
+                        //await _connection
+                        //    .WriteAsync(message, _cancellationSource.Token)
+                        //    .ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException)
                 {
                     break;
+                }
+                catch (Exception ex)
+                {
+                    Debugger.Break();
                 }
             }
         }

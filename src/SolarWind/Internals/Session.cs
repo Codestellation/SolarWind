@@ -62,6 +62,10 @@ namespace Codestellation.SolarWind.Internals
                     var header = new MessageHeader(typeId, id, replyTo);
                     var message = new Message(header, payload);
                     _outgoingQueue.Enqueue(message);
+                    //if (_logger.IsEnabled(LogLevel.Debug))
+                    //{
+                    //    _logger.LogDebug($"Serialized msg {id.ToString()}");
+                    //}
                 }
                 catch (OperationCanceledException)
                 {
@@ -92,10 +96,11 @@ namespace Codestellation.SolarWind.Internals
                 }
                 catch (Exception ex)
                 {
-                    if(_logger.IsEnabled(LogLevel.Error))
+                    if (_logger.IsEnabled(LogLevel.Error))
                     {
                         _logger.LogError(ex, "Failed to dequeue a message");
                     }
+
                     continue;
                 }
 
@@ -111,10 +116,11 @@ namespace Codestellation.SolarWind.Internals
                     {
                         _logger.LogError(ex, $"Deserialization failure. {incoming.Header.ToString()}");
                     }
+
                     incoming.Dispose();
                     continue;
                 }
-                
+
                 try
                 {
                     _callback(incoming.Header, data);
@@ -141,6 +147,10 @@ namespace Codestellation.SolarWind.Internals
             }
 
             _serializationQueue.Enqueue((id, replyTo, data));
+            //if (_logger.IsEnabled(LogLevel.Debug))
+            //{
+            //    _logger.LogDebug($"Enqueued msg {id.ToString()}");
+            //}
             return id;
         }
 

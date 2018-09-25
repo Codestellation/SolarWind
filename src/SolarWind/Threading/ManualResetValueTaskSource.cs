@@ -52,14 +52,24 @@ namespace Codestellation.SolarWind.Threading
 
         public short Version => _logic.Version;
 
-        public void SetResult(in T result)
+        public bool SetResult(in T result)
         {
             //If monitor is entered by someone else - we are late, so simply drop results
             if (Monitor.TryEnter(_cancellationCallback))
             {
+                if (_logic.Completed)
+                {
+                    Monitor.Exit(_cancellationCallback);
+                    return false;
+                }
+
                 _logic.SetResult(result);
                 Monitor.Exit(_cancellationCallback);
+
+                return true;
             }
+
+            return false;
         }
 
         public void SetException(Exception error)
@@ -84,7 +94,6 @@ namespace Codestellation.SolarWind.Threading
 
         ref AutoResetValueTaskSourceLogic<T> IStrongBox<AutoResetValueTaskSourceLogic<T>>.Value => ref _logic;
 
-        public bool IsBeingAwaited => _logic.IsBeingAwaited;
 
         public ValueTask<T> AwaitValue(CancellationToken cancellation)
         {
@@ -132,13 +141,12 @@ namespace Codestellation.SolarWind.Threading
             _result = default;
             _error = null;
             Version = 0;
-            IsBeingAwaited = false;
             _registration = null;
         }
 
         public short Version { get; private set; }
 
-        public bool IsBeingAwaited { get; private set; }
+        public bool Completed => _completed;
 
         private void ValidateToken(short token)
         {
@@ -189,7 +197,6 @@ namespace Codestellation.SolarWind.Threading
             _error = null;
             _executionContext = null;
             _capturedContext = null;
-            IsBeingAwaited = false;
             _registration = null;
         }
 
@@ -323,14 +330,12 @@ namespace Codestellation.SolarWind.Threading
 
         public ValueTask<T> AwaitValue<T>(IValueTaskSource<T> source, CancellationTokenRegistration? registration)
         {
-            IsBeingAwaited = true;
             _registration = registration;
             return new ValueTask<T>(source, Version);
         }
 
         public ValueTask AwaitVoid(IValueTaskSource source, CancellationTokenRegistration? registration)
         {
-            IsBeingAwaited = true;
             _registration = registration;
             return new ValueTask(source, Version);
         }

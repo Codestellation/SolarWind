@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Sources;
 using Codestellation.SolarWind.Internals;
 
 namespace Codestellation.SolarWind.Threading
@@ -29,15 +28,18 @@ namespace Codestellation.SolarWind.Threading
         {
             lock (_queue)
             {
-
-                if (_source.IsBeingAwaited && _source.GetStatus(_source.Version) == ValueTaskSourceStatus.Pending)
-                {
-                    _source.SetResult(value);
-                }
-                else
+                if (_queue.Count > 0)
                 {
                     _queue.Enqueue(value);
+                    return;
                 }
+
+                if (_source.SetResult(value))
+                {
+                    return;
+                }
+
+                _queue.Enqueue(value);
             }
         }
 
@@ -55,11 +57,8 @@ namespace Codestellation.SolarWind.Threading
                 {
                     return new ValueTask<T>(result);
                 }
-                else
-                {
-                    
-                    return _source.AwaitValue(cancellation);
-                }
+
+                return _source.AwaitValue(cancellation);
             }
         }
 

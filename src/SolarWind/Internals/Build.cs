@@ -11,6 +11,9 @@ namespace Codestellation.SolarWind.Internals
         /// Creates an instance of <see cref="Socket" /> class initialized for usage in TCP/IP v4 networks
         /// </summary>
         /// <returns></returns>
-        public static Socket TcpIPv4() => new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        public static Socket TcpIPv4() => new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+        {
+            NoDelay = true
+        };
     }
 }
