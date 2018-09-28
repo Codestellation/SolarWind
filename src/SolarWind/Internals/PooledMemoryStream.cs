@@ -1,5 +1,8 @@
 using System;
+using System.Buffers;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -8,46 +11,11 @@ namespace Codestellation.SolarWind.Internals
     //TODO: Made it internal to avoid exposing it for users
     public class PooledMemoryStream : Stream
     {
-        private static readonly ObjectPool<PooledMemoryStream> Pool = new ObjectPool<PooledMemoryStream>(() => new PooledMemoryStream(), 1024);
-
-        public static PooledMemoryStream Rent()
-        {
-            PooledMemoryStream pooledMemoryStream = Pool.Rent();
-            if (pooledMemoryStream.Length > 0)
-            {
-                throw new InvalidOperationException("Stream was not cleaned gracefully");
-            }
-
-            return pooledMemoryStream;
-        }
-
-        public static void ResetAndReturn(PooledMemoryStream stream)
-        {
-            stream.CompleteWrite();
-            stream.CompleteRead();
-            Return(stream);
-        }
-
-        public static void Return(PooledMemoryStream stream)
-        {
-            stream.Reset();
-            Pool.Return(stream);
-        }
-
-        public void Reset()
-        {
-            _length = 0;
-            _memory.Reset();
-        }
-
-        private readonly MemoryOwner _memory;
+        private const int MinBufferSize = 128;
 
         private long _length;
-
-        private PooledMemoryStream()
-        {
-            _memory = new MemoryOwner();
-        }
+        private long _position;
+        private readonly LinkedList<byte[]> _buffers;
 
         public override bool CanRead { get; } = true;
 
@@ -59,50 +27,152 @@ namespace Codestellation.SolarWind.Internals
 
         public override long Position
         {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
+            get => _position;
+            set => _position = value;
         }
+
+        public void Reset()
+        {
+            _length = 0;
+            _position = 0;
+        }
+
+        public PooledMemoryStream()
+        {
+            _buffers = new LinkedList<byte[]>();
+        }
+
 
         public override void Flush()
         {
         }
 
-        public void Write(Memory<byte> from) => Write(from.Span);
-
-        public void Write(Span<byte> from)
+        public override void WriteByte(byte value)
         {
-            _memory.Write(from);
-            _length += from.Length;
+            ReadOnlySpan<byte> from = stackalloc byte[] {value};
+            Write(from);
         }
+
+        public void Write(ReadOnlySpan<byte> from)
+        {
+            int left = from.Length;
+            var start = 0;
+            while (left != 0)
+            {
+                Memory<byte> memory = GetWritableMemory(left);
+                int length = Math.Min(left, memory.Length);
+                from
+                    .Slice(start, length)
+                    .CopyTo(memory.Span);
+
+                left -= length;
+                _position += length;
+                start += length;
+            }
+
+            if (_length < _position)
+            {
+                _length = _position;
+            }
+        }
+
+        //TODO: take into account request size in case of allocation buffers. 
+        private Memory<byte> GetWritableMemory(int requested)
+        {
+            if (_buffers.Count == 0)
+            {
+                return RentNew(requested);
+            }
+
+            var start = (int)_position;
+
+            foreach (byte[] buffer in _buffers)
+            {
+                int tailLength = buffer.Length - start;
+                if (tailLength > 0)
+                {
+                    int length = Math.Min(requested, tailLength);
+                    return new Memory<byte>(buffer, start, length);
+                }
+
+                start -= buffer.Length;
+            }
+
+            return RentNew(requested);
+        }
+
+        private Memory<byte> RentNew(int requested)
+        {
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(BytesToRent);
+            _buffers.AddLast(buffer);
+            int length = Math.Min(requested, buffer.Length);
+            return new Memory<byte>(buffer, 0, length);
+        }
+
+        private int BytesToRent => MinBufferSize << _buffers.Count;
 
         public override void Write(byte[] buffer, int offset, int count) => Write(new Span<byte>(buffer, offset, count));
 
-
-        public int WriteFrom(Stream from, int length)
+        public override unsafe int ReadByte()
         {
-            int written = _memory.WriteFrom(from, length);
-            _length += written;
-            return written;
+            Span<byte> to = stackalloc byte[1];
+
+            return Read(to) == 0 ? -1 : to[0];
         }
 
-        public async ValueTask<int> WriteFromAsync(AsyncNetworkStream from, int length, CancellationToken cancellation)
+        public override int Read(byte[] buffer, int offset, int count) => Read(new Span<byte>(buffer, offset, count));
+
+        public int Read(Span<byte> to)
         {
-            int written = await _memory
-                .WriteFromAsync(from, length, cancellation)
-                .ConfigureAwait(false);
-            _length += written;
-            return written;
+            if (to.Length == 0)
+            {
+                return 0;
+            }
+
+            int left = to.Length;
+            Span<byte> currentTo = to;
+            while (left != 0 && TryGetReadableSpan(left, out ReadOnlySpan<byte> from))
+            {
+                from.CopyTo(currentTo);
+                left -= from.Length;
+                currentTo = currentTo.Slice(from.Length);
+            }
+
+            return to.Length - left;
         }
 
-        public override int ReadByte() => throw new NotSupportedException();
+        private bool TryGetReadableSpan(int requested, out ReadOnlySpan<byte> from)
+        {
+            if (_length == _position)
+            {
+                from = default;
+                return false;
+            }
 
-        public override int Read(byte[] buffer, int offset, int count) => _memory.Read(new Memory<byte>(buffer, offset, count));
+            var start = (int)_position;
+            var totalNotRead = (int)(_length - _position);
+            int maxToRead = Math.Min(totalNotRead, requested);
 
-        public int Read(in Span<byte> buffer) => _memory.Read(buffer);
+            foreach (byte[] buffer in _buffers)
+            {
+                if (buffer.Length - start > 0)
+                {
+                    //So we found a buffer to read. 
+                    int bufferTail = buffer.Length - start;
+                    int spanLength = Math.Min(bufferTail, maxToRead);
+                    from = new ReadOnlySpan<byte>(buffer, start, spanLength);
 
-        public void CopyInto(Stream stream) => _memory.CopyTo(stream);
+                    _position += from.Length;
+                    return true;
+                }
 
-        public ValueTask CopyIntoAsync(AsyncNetworkStream stream, CancellationToken cancellation) => _memory.CopyToAsync(stream, cancellation);
+                start -= buffer.Length;
+            }
+
+            from = default;
+            return false;
+        }
+
 
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
@@ -110,11 +180,72 @@ namespace Codestellation.SolarWind.Internals
 
         protected override void Dispose(bool disposing)
         {
+            if (disposing)
+            {
+                ReturnBuffers();
+                GC.SuppressFinalize(this);
+            }
         }
 
+        ~PooledMemoryStream()
+        {
+            ReturnBuffers();
+        }
 
-        public void CompleteWrite() => _memory.CompleteWrite();
+        private void ReturnBuffers()
+        {
+            foreach (byte[] buffer in _buffers)
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
 
-        public void CompleteRead() => _memory.CompleteRead();
+            _buffers.Clear();
+        }
+
+        public int Write(Stream from, int count)
+        {
+            if (count == 0)
+            {
+                return 0;
+            }
+
+            var lastRead = 0;
+            int left = count;
+
+            do
+            {
+                MemoryMarshal.TryGetArray(GetWritableMemory(left), out ArraySegment<byte> segment);
+                int bytesToRead = Math.Min(count, segment.Count);
+                lastRead = from.Read(segment.Array, segment.Offset, bytesToRead);
+                left -= lastRead;
+                _position += lastRead;
+            } while (left != 0 && lastRead > 0);
+
+            if (_position > _length)
+            {
+                _length = _position;
+            }
+
+            return count - left;
+        }
+
+        public ValueTask<int> WriteAsync(AsyncNetworkStream from, int count, CancellationToken cancellation) => new ValueTask<int>(Write(from, count));
+
+        public ValueTask CopyIntoAsync(AsyncNetworkStream destination, CancellationToken cancellation)
+        {
+            CopyInto(destination);
+            return new ValueTask(Task.CompletedTask);
+        }
+
+        public void CopyInto(Stream destination)
+        {
+            var left = (int)_length;
+            foreach (byte[] buffer in _buffers)
+            {
+                int bytesToCopy = Math.Min(left, buffer.Length);
+                destination.Write(buffer, 0, bytesToCopy);
+                left -= bytesToCopy;
+            }
+        }
     }
 }

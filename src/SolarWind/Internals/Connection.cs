@@ -36,10 +36,8 @@ namespace Codestellation.SolarWind.Internals
                     throw new TaskCanceledException();
                 }
 
-                left -= await readBuffer.WriteFromAsync(Stream, bytesToReceive, cancellation).ConfigureAwait(false);
+                left -= await readBuffer.WriteAsync(Stream, bytesToReceive, cancellation).ConfigureAwait(false);
             }
-
-            readBuffer.CompleteWrite();
         }
 
         public void Close() => Stream.Close();
@@ -137,6 +135,16 @@ namespace Codestellation.SolarWind.Internals
                 .ConfigureAwait(false);
             var connection = new Connection(networkStream, logger);
             onConnected(remoteUri, handshakeResponse.HubId, connection);
+        }
+
+        internal void Receive(PooledMemoryStream readBuffer, int bytesToReceive)
+        {
+            int left = bytesToReceive;
+
+            while (left != 0)
+            {
+                left -= readBuffer.Write(Stream, bytesToReceive);
+            }
         }
 
         private static void ConfigureSocket(Socket socket) => socket.ReceiveTimeout = 10_000;

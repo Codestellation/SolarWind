@@ -37,7 +37,7 @@ namespace Codestellation.SolarWind.Internals
 
         public static async ValueTask<HandshakeMessage> ReceiveHandshake(this AsyncNetworkStream self)
         {
-            PooledMemoryStream buffer = PooledMemoryStream.Rent();
+            var buffer = new PooledMemoryStream();
             try
             {
                 if (!await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(false))
@@ -45,9 +45,9 @@ namespace Codestellation.SolarWind.Internals
                     return null;
                 }
 
+                buffer.Position = 0;
                 WireHeader wireHeader = WireHeader.ReadFrom(buffer);
 
-                buffer.CompleteRead();
                 buffer.Reset();
 
                 if (!wireHeader.IsHandshake)
@@ -60,13 +60,12 @@ namespace Codestellation.SolarWind.Internals
                     return null;
                 }
 
+                buffer.Position = 0;
                 return HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
             }
             finally
             {
-                buffer.CompleteRead();
-                buffer.CompleteWrite();
-                PooledMemoryStream.Return(buffer);
+                buffer.Dispose();
             }
         }
 
@@ -76,11 +75,9 @@ namespace Codestellation.SolarWind.Internals
             do
             {
                 left -= await readBuffer
-                    .WriteFromAsync(self, left, CancellationToken.None)
+                    .WriteAsync(self, left, CancellationToken.None)
                     .ConfigureAwait(false);
             } while (left != 0);
-
-            readBuffer.CompleteWrite();
 
             return true;
         }

@@ -42,7 +42,7 @@ namespace Codestellation.SolarWind.Tests
             _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, delegate { }));
 
-            _count = 1_000_0;
+            _count = 1_000_000;
 
             _serverReceived = 0;
 
@@ -59,7 +59,7 @@ namespace Codestellation.SolarWind.Tests
             var buffer = new byte[1024];
             while (true)
             {
-                var read = server.Read(buffer, 0, WireHeader.Size); // receive wire header
+                int read = server.Read(buffer, 0, WireHeader.Size); // receive wire header
                 WireHeader header = WireHeader.ReadFrom(buffer);
 
                 if (read != WireHeader.Size)

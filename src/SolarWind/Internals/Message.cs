@@ -16,14 +16,6 @@ namespace Codestellation.SolarWind.Internals
             Payload = payload ?? throw new ArgumentNullException(nameof(payload));
         }
 
-        public void Dispose()
-        {
-            if (Payload != null)
-            {
-                Payload.CompleteWrite();
-                Payload.CompleteRead();
-                PooledMemoryStream.Return(Payload);
-            }
-        }
+        public void Dispose() => Payload?.Dispose();
     }
 }

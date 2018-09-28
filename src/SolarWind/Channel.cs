@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
-using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using Microsoft.Extensions.Logging;
@@ -16,8 +15,8 @@ namespace Codestellation.SolarWind
         private Connection _connection;
         private readonly ChannelOptions _options;
 
-        private Task _reader;
-        private Task _writer;
+        private Thread _reader;
+        private Thread _writer;
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
         private SolarWindCallback _callback;
@@ -43,8 +42,11 @@ namespace Codestellation.SolarWind
             Stop();
             _cancellationSource = new CancellationTokenSource();
             _connection = connection;
-            _reader = Task.Run(() => StartReadingTask());
-            _writer = Task.Run(() => StartWritingTask());
+            _reader = new Thread(StartReadingTask);
+            _reader.Start();
+
+            _writer = new Thread(StartWritingTask);
+            _writer.Start();
         }
 
         /// <summary>
@@ -63,29 +65,29 @@ namespace Codestellation.SolarWind
         public void SetCallback(SolarWindCallback callback)
             => _callback = callback ?? throw new ArgumentNullException(nameof(callback));
 
-        private async void StartReadingTask()
+        private void StartReadingTask()
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
-                await Receive().ConfigureAwait(false);
+                Receive();
             }
 
             _connection.Close();
         }
 
-        private async Task Receive()
+        private void Receive()
         {
-            PooledMemoryStream buffer = PooledMemoryStream.Rent();
+            var buffer = new PooledMemoryStream();
             Message message;
             try
             {
-                await Receive(buffer, WireHeader.Size).ConfigureAwait(false);
-
+                Receive(buffer, WireHeader.Size);
+                buffer.Position = 0;
                 WireHeader wireHeader = WireHeader.ReadFrom(buffer);
-                buffer.CompleteRead();
                 buffer.Reset();
 
-                await Receive(buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
+                Receive(buffer, wireHeader.PayloadSize.Value);
+                buffer.Position = 0;
                 message = new Message(wireHeader.MessageHeader, buffer);
             }
             catch (Exception ex)
@@ -98,7 +100,7 @@ namespace Codestellation.SolarWind
                     }
                 }
 
-                PooledMemoryStream.ResetAndReturn(buffer);
+                buffer.Dispose();
                 return;
             }
 
@@ -120,7 +122,7 @@ namespace Codestellation.SolarWind
             }
         }
 
-        private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count, _cancellationSource.Token);
+        private void Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count);
 
         private async void StartWritingTask()
         {
@@ -130,7 +132,7 @@ namespace Codestellation.SolarWind
                 {
                     if (_session.TryDequeueAsync(out Message message))
                     {
-                        _logger.LogDebug($"Writing message {message.Header.ToString()}");
+                        //_logger.LogDebug($"Writing message {message.Header.ToString()}");
 
                         using (message)
                         {
@@ -168,8 +170,8 @@ namespace Codestellation.SolarWind
 
             _cancellationSource.Cancel();
             //writer must be stopped before stopping reader because reader is responsible for closing socket.  
-            _writer.Wait();
-            _reader.Wait();
+            //_writer.Wait();
+            //_reader.Wait();
         }
     }
 }

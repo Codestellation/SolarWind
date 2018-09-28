@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text;
 using Codestellation.SolarWind.Internals;
@@ -6,53 +7,107 @@ using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
 {
-    [TestFixture]
+    [TestFixture(0)]
+    [TestFixture(1)]
+    [TestFixture(12)]
+    [TestFixture(128)]
+    [TestFixture(16000)]
+    [TestFixture(1024 * 1024)]
     public class PooledMemoryStreamTest
     {
-        private PooledMemoryStream _stream;
+        private readonly Random _random;
+        private readonly int _dataSize;
 
-        [SetUp]
-        public void Setup() => _stream = PooledMemoryStream.Rent();
-
-        [TearDown]
-        public void Teardown() => PooledMemoryStream.Return(_stream);
+        public PooledMemoryStreamTest(int dataSize)
+        {
+            _random = new Random();
+            _dataSize = dataSize;
+        }
 
         [Test]
-        public void Should_be_able_to_write_and_read()
+        public void Should_return_zero_read_bytes_if_eof()
         {
-            byte[] origin = Encoding.UTF8.GetBytes("Hello World!");
-            _stream.Write(origin, 0, origin.Length);
-            _stream.CompleteWrite();
+            using (var stream = new PooledMemoryStream())
+            {
+                byte[] origin = WriteSomeBytes(stream, _dataSize);
 
-            var actual = new byte[origin.Length];
+                (int bytesRead, _) = ReadSomeBytes(stream, origin.Length);
 
-            int readBytes = _stream.Read(actual, 0, actual.Length);
+                stream.Position.Should().Be(origin.Length);
+                bytesRead.Should().Be(0);
+            }
+        }
 
-            _stream.CompleteRead();
+        [Test]
+        public void Should_return_zero_read_bytes_if_eof2()
+        {
+            using (var stream = new PooledMemoryStream())
+            {
+                byte[] origin = WriteSomeBytes(stream, _dataSize);
 
-            readBytes.Should().Be(origin.Length);
-            actual.Should().BeEquivalentTo(origin);
+                (int bytesRead, _) = ReadSomeBytes(stream, origin.Length + 10);
+
+                stream.Position.Should().Be(origin.Length);
+                bytesRead.Should().Be(0);
+            }
         }
 
 
         [Test]
+        public void Should_be_able_to_write_and_read()
+        {
+            using (var stream = new PooledMemoryStream())
+            {
+                byte[] origin = WriteSomeBytes(stream, _dataSize);
+                stream.Position = 0;
+                (int bytesRead, byte[] actual) = ReadSomeBytes(stream, origin.Length);
+
+                bytesRead.Should().Be(origin.Length);
+                stream.Position.Should().Be(origin.Length);
+                actual.Should().BeEquivalentTo(origin);
+            }
+        }
+
+        [Test]
         public void Should_be_able_to_read_from_stream()
         {
-            byte[] origin = Encoding.UTF8.GetBytes("Hello World!");
-            var memory = new MemoryStream();
-            memory.Write(origin, 0, origin.Length);
-            memory.Position = 0;
-            _stream.WriteFrom(memory, origin.Length);
-            _stream.CompleteWrite();
+            using (var stream = new PooledMemoryStream())
+            {
+                var memory = new MemoryStream();
+                byte[] origin = WriteSomeBytes(memory, _dataSize);
+                memory.Position = 0;
 
-            var actual = new byte[origin.Length];
+                stream.Write(memory, origin.Length);
 
-            int readBytes = _stream.Read(actual, 0, actual.Length);
+                var actual = new byte[origin.Length];
 
-            _stream.CompleteRead();
+                stream.Position = 0;
+                int readBytes = stream.Read(actual, 0, actual.Length);
 
-            readBytes.Should().Be(origin.Length);
-            actual.Should().BeEquivalentTo(origin);
+
+                readBytes.Should().Be(origin.Length);
+                actual.Should().BeEquivalentTo(origin);
+            }
+        }
+
+        private static (int bytesRead, byte[] actual) ReadSomeBytes(PooledMemoryStream stream, int length)
+        {
+            var actual = new byte[length];
+            int readBytes = stream.Read(actual, 0, actual.Length);
+            return (readBytes, actual);
+        }
+
+        private byte[] WriteSomeBytes(Stream stream, int count)
+        {
+            var chars = new char[count];
+            for (var i = 0; i < count; i++)
+            {
+                chars[i] = (char)_random.Next('a', 'z');
+            }
+
+            byte[] origin = Encoding.UTF8.GetBytes(chars);
+            stream.Write(origin, 0, origin.Length);
+            return origin;
         }
     }
 }

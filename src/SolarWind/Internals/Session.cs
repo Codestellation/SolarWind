@@ -1,8 +1,6 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
-using Codestellation.SolarWind.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
@@ -18,14 +16,14 @@ namespace Codestellation.SolarWind.Internals
         private readonly ArrayBlockingQueue<Message> _outgoingQueue;
 
         private MessageId _currentMessageId;
-        private readonly AwaitableQueue<Message> _incomingQueue;
+        private readonly ArrayBlockingQueue<Message> _incomingQueue;
 
         private readonly CancellationTokenSource _disposal;
-        private readonly AwaitableQueue<(MessageId id, MessageId replyTo, object data)> _serializationQueue;
+        private readonly ArrayBlockingQueue<(MessageId id, MessageId replyTo, object data)> _serializationQueue;
 
-        private readonly Task _serialization;
-        private readonly Task _deserialization;
         private readonly ILogger _logger;
+        private readonly Thread _serializationThread;
+        private readonly Thread _deserializationThread;
 
         public Session(ISerializer serializer, DeserializationCallback callback, ILogger logger)
         {
@@ -34,47 +32,47 @@ namespace Codestellation.SolarWind.Internals
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
-            _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ForceDefaultTaskScheduler);
+            _serializationQueue = new ArrayBlockingQueue<(MessageId id, MessageId replyTo, object data)>();
             _outgoingQueue = new ArrayBlockingQueue<Message>();
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
             // message processing as well and thus stop reading all the sockets. 
-            _incomingQueue = new AwaitableQueue<Message>();
+            _incomingQueue = new ArrayBlockingQueue<Message>();
             _disposal = new CancellationTokenSource();
 
-            _serialization = StartSerializationTask();
-            _deserialization = StartDeserializationTask();
+            _serializationThread = new Thread(StartSerializationTask);
+            _serializationThread.Start();
+
+            _deserializationThread = new Thread(StartDeserializationTask);
+            _deserializationThread.Start();
         }
 
-        private async Task StartSerializationTask()
+        private void StartSerializationTask()
         {
             while (!_disposal.IsCancellationRequested)
             {
-                (MessageId id, MessageId replyTo, object data) = await _serializationQueue
-                    .Await(_disposal.Token)
-                    .ConfigureAwait(false);
+                if (!_serializationQueue.TryDequeue(out (MessageId id, MessageId replyTo, object data) tuple))
+                {
+                    continue;
+                }
 
-                PooledMemoryStream payload = PooledMemoryStream.Rent();
+                var payload = new PooledMemoryStream();
                 try
                 {
-                    MessageTypeId typeId = _serializer.Serialize(data, payload);
-                    payload.CompleteWrite();
-                    var header = new MessageHeader(typeId, id, replyTo);
+                    MessageTypeId typeId = _serializer.Serialize(tuple.data, payload);
+                    var header = new MessageHeader(typeId, tuple.id, tuple.replyTo);
                     var message = new Message(header, payload);
+                    payload.Position = 0;
                     _outgoingQueue.Enqueue(message);
-                    //if (_logger.IsEnabled(LogLevel.Debug))
-                    //{
-                    //    _logger.LogDebug($"Serialized msg {id.ToString()}");
-                    //}
                 }
                 catch (OperationCanceledException)
                 {
-                    PooledMemoryStream.ResetAndReturn(payload);
+                    payload.Dispose();
                     break;
                 }
                 catch (Exception ex)
                 {
-                    PooledMemoryStream.ResetAndReturn(payload);
+                    payload.Dispose();
                     if (_logger.IsEnabled(LogLevel.Error))
                     {
                         _logger.LogError(ex, "Serialization failure.");
@@ -83,24 +81,14 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        private async Task StartDeserializationTask()
+        private void StartDeserializationTask()
         {
             //TODO: Handle exception to avoid exiting deserialization thread
             //TODO: Implement graceful shutdown
             while (!_disposal.IsCancellationRequested)
             {
-                Message incoming = default;
-                try
+                if (!_incomingQueue.TryDequeue(out Message incoming))
                 {
-                    incoming = await _incomingQueue.Await(_disposal.Token).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    if (_logger.IsEnabled(LogLevel.Error))
-                    {
-                        _logger.LogError(ex, "Failed to dequeue a message");
-                    }
-
                     continue;
                 }
 
@@ -158,6 +146,7 @@ namespace Codestellation.SolarWind.Internals
 
         public void Dispose()
         {
+            _disposal.Cancel();
             _incomingQueue.Dispose(m => m.Dispose());
             _outgoingQueue.Dispose(m => m.Dispose());
             _serializationQueue.Dispose(m => { });
