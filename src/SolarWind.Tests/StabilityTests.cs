@@ -42,7 +42,7 @@ namespace Codestellation.SolarWind.Tests
             _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, delegate { }));
 
-            _count = 1_000_000;
+            _count = 2;
 
             _serverReceived = 0;
 
@@ -56,28 +56,32 @@ namespace Codestellation.SolarWind.Tests
 
             server.SendHandshake(HubId.Generate());
 
-            var buffer = new byte[1024];
-            while (true)
+            using (var buffer = new PooledMemoryStream())
             {
-                int read = server.Read(buffer, 0, WireHeader.Size); // receive wire header
-                WireHeader header = WireHeader.ReadFrom(buffer);
-
-                if (read != WireHeader.Size)
+                while (true)
                 {
-                    throw new InvalidOperationException();
-                }
+                    buffer.Reset();
+                    Receive(server, buffer, WireHeader.Size);
+                    WireHeader header = WireHeader.ReadFrom(buffer);
+                    Console.WriteLine(header.MessageHeader);
+                    Receive(server, buffer, header.PayloadSize.Value);
 
-                if (server.Read(buffer, 0, header.PayloadSize.Value) != header.PayloadSize.Value)
-                {
-                    throw new InvalidOperationException();
-                }
+                    _serverReceived++;
 
-                _serverReceived++;
-
-                if (_serverReceived == _count + 1)
-                {
-                    _allMessagesReceived.Set();
+                    if (_serverReceived == _count + 1)
+                    {
+                        _allMessagesReceived.Set();
+                    }
                 }
+            }
+        }
+
+        internal void Receive(NetworkStream from, PooledMemoryStream to, int bytesToReceive)
+        {
+            int left = bytesToReceive;
+            while (left != 0)
+            {
+                left -= to.Write(from, bytesToReceive);
             }
         }
 
@@ -98,12 +102,11 @@ namespace Codestellation.SolarWind.Tests
                 _channelToServer.Post(new TextMessage {Text = $"Hello {i.ToString(CultureInfo.InvariantCulture)}, server !"});
             }
 
-            watch.Stop();
-
             Console.WriteLine($"Pushed all messages in {watch.ElapsedMilliseconds}");
 
             var previous = 0;
             var times = 200;
+
             while (!_allMessagesReceived.WaitOne(TimeSpan.FromSeconds(1)))
             {
                 if (--times == 0)
@@ -120,6 +123,9 @@ namespace Codestellation.SolarWind.Tests
                 break;
             }
 
+            watch.Stop();
+
+            Console.WriteLine($"Finished in {watch.ElapsedMilliseconds:N3} ms");
 
             _serverReceived.Should().Be(_count + 1);
         }

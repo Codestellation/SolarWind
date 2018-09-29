@@ -124,7 +124,7 @@ namespace Codestellation.SolarWind
 
         private void Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count);
 
-        private async void StartWritingTask()
+        private void StartWritingTask()
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
@@ -140,6 +140,7 @@ namespace Codestellation.SolarWind
                             //await _connection
                             //    .WriteAsync(message, _cancellationSource.Token)
                             //    .ConfigureAwait(false);
+                            _connection.Flush();
                         }
                     }
                 }

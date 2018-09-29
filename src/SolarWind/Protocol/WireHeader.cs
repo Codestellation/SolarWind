@@ -28,19 +28,17 @@ namespace Codestellation.SolarWind.Protocol
         {
             fixed (byte* p = buffer)
             {
-                *((WireHeader*)p) = wireHeader;
+                *(WireHeader*)p = wireHeader;
             }
         }
 
         public static unsafe void WriteTo(in WireHeader wireHeader, PooledMemoryStream buffer)
         {
-            Span<byte> span = stackalloc byte[Size];
-            fixed (byte* p = span)
+            fixed (WireHeader* wh = &wireHeader)
             {
-                *((WireHeader*)p) = wireHeader;
+                var span = new Span<byte>(wh, Size);
+                buffer.Write(span);
             }
-
-            buffer.Write(span);
         }
 
         public static unsafe ref WireHeader ReadFrom(PooledMemoryStream buffer)
@@ -49,7 +47,7 @@ namespace Codestellation.SolarWind.Protocol
             buffer.Read(span);
             fixed (byte* p = span)
             {
-                return ref *((WireHeader*)p);
+                return ref *(WireHeader*)p;
             }
         }
 
@@ -57,7 +55,7 @@ namespace Codestellation.SolarWind.Protocol
         {
             fixed (byte* p = buffer)
             {
-                return ref *((WireHeader*)p);
+                return ref *(WireHeader*)p;
             }
         }
     }

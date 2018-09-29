@@ -12,17 +12,15 @@ namespace Codestellation.SolarWind.Internals
     {
         private readonly AsyncNetworkStream _networkStream;
         private readonly ILogger _logger;
+        private readonly DuplexBufferedStream _mainStream;
 
-        /// <summary>
-        /// Could be either <see cref="NetworkStream" /> or <see cref="SslStream" />
-        /// </summary>
-        public AsyncNetworkStream Stream { get; }
 
         private Connection(AsyncNetworkStream networkStream, ILogger logger)
         {
             _networkStream = networkStream ?? throw new ArgumentNullException(nameof(networkStream));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            Stream = _networkStream;
+
+            _mainStream = new DuplexBufferedStream(_networkStream);
         }
 
         public async ValueTask Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
@@ -36,11 +34,11 @@ namespace Codestellation.SolarWind.Internals
                     throw new TaskCanceledException();
                 }
 
-                left -= await readBuffer.WriteAsync(Stream, bytesToReceive, cancellation).ConfigureAwait(false);
+                left -= await readBuffer.WriteAsync(_mainStream, bytesToReceive, cancellation).ConfigureAwait(false);
             }
         }
 
-        public void Close() => Stream.Close();
+        public void Close() => _mainStream.Close();
 
         public async ValueTask WriteAsync(Message message, CancellationToken cancellation)
         {
@@ -49,13 +47,13 @@ namespace Codestellation.SolarWind.Internals
             byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
 
             WireHeader.WriteTo(wireHeader, buffer);
-            await Stream.WriteAsync(buffer, 0, WireHeader.Size, cancellation).ConfigureAwait(false);
+            await _mainStream.WriteAsync(buffer, 0, WireHeader.Size, cancellation).ConfigureAwait(false);
             _logger.LogDebug($"Written header {message.Header.ToString()}");
 
             ArrayPool<byte>.Shared.Return(buffer);
             _logger.LogDebug($"Writing payload {message.Header.ToString()}");
 
-            await message.Payload.CopyIntoAsync(Stream, cancellation);
+            await message.Payload.CopyIntoAsync(_mainStream, cancellation);
 
             _logger.LogDebug($"Written payload {message.Header.ToString()}");
         }
@@ -143,7 +141,7 @@ namespace Codestellation.SolarWind.Internals
 
             while (left != 0)
             {
-                left -= readBuffer.Write(Stream, bytesToReceive);
+                left -= readBuffer.Write(_mainStream, bytesToReceive);
             }
         }
 
@@ -156,15 +154,17 @@ namespace Codestellation.SolarWind.Internals
             byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
 
             WireHeader.WriteTo(wireHeader, buffer);
-            Stream.Write(buffer, 0, WireHeader.Size);
+            _mainStream.Write(buffer, 0, WireHeader.Size);
             //_logger.LogDebug($"Written header {message.Header.ToString()}");
 
             ArrayPool<byte>.Shared.Return(buffer);
             //_logger.LogDebug($"Writing payload {message.Header.ToString()}");
 
-            message.Payload.CopyInto(Stream);
+            message.Payload.CopyInto(_mainStream);
 
             //_logger.LogDebug($"Written payload {message.Header.ToString()}");
         }
+
+        public void Flush() => _mainStream.Flush();
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -229,9 +230,9 @@ namespace Codestellation.SolarWind.Internals
             return count - left;
         }
 
-        public ValueTask<int> WriteAsync(AsyncNetworkStream from, int count, CancellationToken cancellation) => new ValueTask<int>(Write(from, count));
+        public ValueTask<int> WriteAsync(Stream from, int count, CancellationToken cancellation) => new ValueTask<int>(Write(from, count));
 
-        public ValueTask CopyIntoAsync(AsyncNetworkStream destination, CancellationToken cancellation)
+        public ValueTask CopyIntoAsync(Stream destination, CancellationToken cancellation)
         {
             CopyInto(destination);
             return new ValueTask(Task.CompletedTask);
