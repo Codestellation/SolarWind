@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Threading;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
@@ -94,11 +95,13 @@ namespace Codestellation.SolarWind
             {
                 if (!(ex is OperationCanceledException))
                 {
-                    if (_logger.IsEnabled(LogLevel.Error))
-                    {
-                        _logger.LogError(ex, "Error during receive");
-                    }
+                    //if (_logger.IsEnabled(LogLevel.Error))
+                    //{
+                    //    _logger.LogError(ex, "Error during receive");
+                    //}
                 }
+                //if(ex is SocketException sex && sex.ErrorCode == SocketError.TimedOut)
+
 
                 buffer.Dispose();
                 return;

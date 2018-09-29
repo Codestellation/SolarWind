@@ -145,19 +145,19 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        private static void ConfigureSocket(Socket socket) => socket.ReceiveTimeout = 10_000;
+        private static void ConfigureSocket(Socket socket)
+        {
+            socket.ReceiveTimeout = 10_000;
+            socket.SendTimeout = 1000;
+        }
 
         public void Write(in Message message)
         {
             //_logger.LogDebug($"Writing header {message.Header.ToString()}");
             var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
-
-            WireHeader.WriteTo(wireHeader, buffer);
-            _mainStream.Write(buffer, 0, WireHeader.Size);
+            WireHeader.WriteTo(wireHeader, _mainStream);
             //_logger.LogDebug($"Written header {message.Header.ToString()}");
 
-            ArrayPool<byte>.Shared.Return(buffer);
             //_logger.LogDebug($"Writing payload {message.Header.ToString()}");
 
             message.Payload.CopyInto(_mainStream);

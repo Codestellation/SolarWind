@@ -42,7 +42,7 @@ namespace Codestellation.SolarWind.Tests
             _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, delegate { }));
 
-            _count = 2;
+            _count = 1_000_000;
 
             _serverReceived = 0;
 
@@ -62,8 +62,9 @@ namespace Codestellation.SolarWind.Tests
                 {
                     buffer.Reset();
                     Receive(server, buffer, WireHeader.Size);
+                    buffer.Position = 0;
                     WireHeader header = WireHeader.ReadFrom(buffer);
-                    Console.WriteLine(header.MessageHeader);
+                    //Console.WriteLine(header.MessageHeader);
                     Receive(server, buffer, header.PayloadSize.Value);
 
                     _serverReceived++;
@@ -114,18 +115,17 @@ namespace Codestellation.SolarWind.Tests
                     break;
                 }
 
-                if (_serverReceived > previous)
+                if (_serverReceived == previous)
                 {
-                    previous = _serverReceived;
-                    continue;
+                    break;
                 }
 
-                break;
+                previous = _serverReceived;
             }
 
             watch.Stop();
 
-            Console.WriteLine($"Finished in {watch.ElapsedMilliseconds:N3} ms");
+            Console.WriteLine($"Finished in {watch.ElapsedMilliseconds:N3} ms, perf {_count * 1000.0 / watch.ElapsedMilliseconds:N} msg/sec");
 
             _serverReceived.Should().Be(_count + 1);
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text;
 using Codestellation.SolarWind.Internals;
@@ -75,7 +75,7 @@ namespace Codestellation.SolarWind.Tests
         private static (int bytesRead, byte[] actual) ReadSomeBytes(Stream stream, int length)
         {
             var actual = new byte[length];
-            var totalRead = length;
+            var totalRead = 0;
             while (totalRead < length)
             {
                 int readBytes = stream.Read(actual, totalRead, length - totalRead);

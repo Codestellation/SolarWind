@@ -246,6 +246,10 @@ namespace Codestellation.SolarWind.Internals
                 int bytesToCopy = Math.Min(left, buffer.Length);
                 destination.Write(buffer, 0, bytesToCopy);
                 left -= bytesToCopy;
+                if (left == 0)
+                {
+                    break;
+                }
             }
         }
     }
