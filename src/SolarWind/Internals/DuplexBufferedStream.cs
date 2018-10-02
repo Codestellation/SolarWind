@@ -15,6 +15,7 @@ namespace Codestellation.SolarWind.Internals
 
         private readonly byte[] _writeBuffer;
         private int _writePos;
+        private readonly AsyncNetworkStream _asyncStream;
 
 
         public override bool CanRead => true;
@@ -29,28 +30,35 @@ namespace Codestellation.SolarWind.Internals
             set => throw new NotSupportedException();
         }
 
-
         public DuplexBufferedStream(Stream inner, int bufferSize = 64 * 1024) //default size of socket buffers
         {
             _inner = inner;
+            _asyncStream = inner as AsyncNetworkStream;
             _readBuffer = new byte[bufferSize];
             _writeBuffer = new byte[bufferSize];
         }
 
-        public override void Flush() => InternalFlush();
-
-        private void InternalFlush()
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellation)
         {
-            if (_writePos == 0)
+            if (_asyncStream == null)
             {
-                return;
+                return _inner.ReadAsync(buffer, offset, count, cancellation);
             }
 
-            _inner.Write(_writeBuffer, 0, _writePos);
-            _writePos = 0;
+            return ReadAsync(new Memory<byte>(buffer, offset, count), cancellation).AsTask();
         }
 
+#if NETSTANDARD2_0
+        public ValueTask<int> ReadAsync(Memory<byte> to, CancellationToken cancellation)
+        {
+            if (_asyncStream == null)
+            {
+                throw new NotImplementedException();
+            }
 
+            return _asyncStream.ReadAsync(to, cancellation);
+        }
+#endif
         public override int Read(byte[] buffer, int offset, int count) => Read(new Span<byte>(buffer, offset, count));
 
         public int Read(Span<byte> to)
@@ -82,6 +90,15 @@ namespace Codestellation.SolarWind.Internals
             return from.Length;
         }
 
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> from, CancellationToken cancellation)
+        {
+            if (_asyncStream == null)
+            {
+                throw new NotSupportedException();
+            }
+
+            return _asyncStream.WriteAsync(from, cancellation);
+        }
 
         public override void Write(byte[] buffer, int offset, int count) => Write(new ReadOnlySpan<byte>(buffer, offset, count));
 
@@ -115,16 +132,36 @@ namespace Codestellation.SolarWind.Internals
 
         protected override void Dispose(bool disposing) => _inner.Dispose();
 
-        public override Task FlushAsync(CancellationToken cancellation)
+        public override async Task FlushAsync(CancellationToken cancellation)
         {
             if (_writePos == 0)
             {
-                return Task.CompletedTask;
+                return;
             }
 
-            Task task = _inner.WriteAsync(_writeBuffer, 0, _writePos, cancellation);
+            if (_asyncStream == null)
+            {
+                Task task = _inner.WriteAsync(_writeBuffer, 0, _writePos, cancellation);
+                _writePos = 0;
+                await task.ConfigureAwait(false);
+                return;
+            }
+
+            var memory = new ReadOnlyMemory<byte>(_writeBuffer, 0, _writePos);
+            await _asyncStream.WriteAsync(memory, cancellation).ConfigureAwait(false);
+        }
+
+        public override void Flush() => InternalFlush();
+
+        private void InternalFlush()
+        {
+            if (_writePos == 0)
+            {
+                return;
+            }
+
+            _inner.Write(_writeBuffer, 0, _writePos);
             _writePos = 0;
-            return task;
         }
     }
 }
