@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -43,6 +45,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 return;
             }
+
             _inner.Write(_writeBuffer, 0, _writePos);
             _writePos = 0;
         }
@@ -85,7 +88,7 @@ namespace Codestellation.SolarWind.Internals
         public void Write(ReadOnlySpan<byte> from)
         {
             int left = from.Length;
-            int written = 0;
+            var written = 0;
             do
             {
                 Span<byte> to = new Span<byte>(_writeBuffer).Slice(_writePos);
@@ -101,7 +104,6 @@ namespace Codestellation.SolarWind.Internals
                 {
                     InternalFlush();
                 }
-
             } while (left != 0);
         }
 
@@ -112,5 +114,17 @@ namespace Codestellation.SolarWind.Internals
         public override void Close() => _inner.Close();
 
         protected override void Dispose(bool disposing) => _inner.Dispose();
+
+        public override Task FlushAsync(CancellationToken cancellation)
+        {
+            if (_writePos == 0)
+            {
+                return Task.CompletedTask;
+            }
+
+            Task task = _inner.WriteAsync(_writeBuffer, 0, _writePos, cancellation);
+            _writePos = 0;
+            return task;
+        }
     }
 }

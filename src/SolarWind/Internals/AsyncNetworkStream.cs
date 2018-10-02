@@ -27,17 +27,14 @@ namespace Codestellation.SolarWind.Internals
             _sendSource = new AutoResetValueTaskSource<int>();
         }
 
-
+#if NETSTANDARD2_0
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellation)
             => await ReadAsync(new Memory<byte>(buffer, offset, count), cancellation)
                 .ConfigureAwait(false);
 
         //See comments at the top
-        public
-#if !NETSTANDARD2_0
-        override
-#endif
-            async ValueTask<int> ReadAsync(Memory<byte> to, CancellationToken cancellation)
+
+        public async ValueTask<int> ReadAsync(Memory<byte> to, CancellationToken cancellation)
         {
             if (!MemoryMarshal.TryGetArray(to, out ArraySegment<byte> segment))
             {
@@ -55,12 +52,11 @@ namespace Codestellation.SolarWind.Internals
             return _receiveArgs.BytesTransferred;
         }
 
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
+
         //See comments at the top
-        public
-#if !NETSTANDARD2_0
-        override
-#endif
-            async ValueTask WriteAsync(ReadOnlyMemory<byte> from, CancellationToken cancellationToken)
+        public async ValueTask WriteAsync(ReadOnlyMemory<byte> from, CancellationToken cancellationToken)
         {
             if (!MemoryMarshal.TryGetArray(from, out ArraySegment<byte> segment))
             {
@@ -98,10 +94,7 @@ namespace Codestellation.SolarWind.Internals
                 left = from.Length - sent;
             }
         }
-
-        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-            await WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).ConfigureAwait(false);
-
+#endif
         private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
         {
             if (e.SocketError == SocketError.Success)

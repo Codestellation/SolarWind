@@ -167,5 +167,7 @@ namespace Codestellation.SolarWind.Internals
         }
 
         public void Flush() => _mainStream.Flush();
+
+        public ValueTask FlushAsync(CancellationToken cancellation) => new ValueTask(_mainStream.FlushAsync(cancellation));
     }
 }
