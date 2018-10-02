@@ -58,9 +58,9 @@ namespace Codestellation.SolarWind.Internals
             _logger.LogDebug($"Written payload {message.Header.ToString()}");
         }
 
-        public static async Task Accept(HubId serverHubId, Socket socket, ILogger logger, Action<HubId, Connection> onAccepted)
+        public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
         {
-            ConfigureSocket(socket);
+            ConfigureSocket(socket, options);
             var networkStream = new AsyncNetworkStream(socket);
             //SslStream sslStream = null;
 
@@ -80,16 +80,16 @@ namespace Codestellation.SolarWind.Internals
 
 
             HandshakeMessage incoming = await networkStream
-                .HandshakeAsServer(serverHubId)
+                .HandshakeAsServer(options.HubId)
                 .ConfigureAwait(false);
-            var connection = new Connection(networkStream, logger);
+            var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>());
             onAccepted(incoming.HubId, connection);
         }
 
         public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, ILogger logger, Action<Uri, HubId, Connection> onConnected)
         {
             Socket socket = Build.TcpIPv4();
-            ConfigureSocket(socket);
+            ConfigureSocket(socket, options);
 
             while (true)
             {
@@ -145,10 +145,11 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        private static void ConfigureSocket(Socket socket)
+        private static void ConfigureSocket(Socket socket, SolarWindHubOptions options)
         {
-            socket.ReceiveTimeout = 10_000;
-            socket.SendTimeout = 1000;
+            socket.NoDelay = options.NoDelay;
+            socket.ReceiveTimeout = (int)options.ReceiveTimeout.TotalMilliseconds;
+            socket.SendTimeout = (int)options.SendTimeout.TotalMilliseconds;
         }
 
         public void Write(in Message message)

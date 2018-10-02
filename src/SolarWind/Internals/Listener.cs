@@ -74,7 +74,7 @@ namespace Codestellation.SolarWind.Internals
                 try
                 {
                     await Connection
-                        .Accept(_hubOptions.HubId, _args.AcceptSocket, _hubOptions.LoggerFactory.CreateLogger<Connection>(), onAccepted)
+                        .Accept(_hubOptions, _args.AcceptSocket, onAccepted)
                         .ConfigureAwait(false);
                 }
                 catch (Exception ex)
