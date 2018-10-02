@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Net.Sockets;
 using System.Threading;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
@@ -129,10 +128,14 @@ namespace Codestellation.SolarWind
 
         private void StartWritingTask()
         {
+            //var batch = new Message[100];
             while (!_cancellationSource.IsCancellationRequested)
             {
                 try
                 {
+                    //Try to dequeue a batch and send and flush after that
+                    //var batchSize = _session.TryDequeueBatch(batch);
+
                     if (_session.TryDequeueAsync(out Message message))
                     {
                         //_logger.LogDebug($"Writing message {message.Header.ToString()}");

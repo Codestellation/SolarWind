@@ -144,6 +144,8 @@ namespace Codestellation.SolarWind.Internals
 
         public bool TryDequeueAsync(out Message result) => _outgoingQueue.TryDequeue(out result);
 
+        public int TryDequeueBatch(Message[] batch) => _outgoingQueue.DequeueBatch(batch);
+
         public void Dispose()
         {
             _disposal.Cancel();

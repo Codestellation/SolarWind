@@ -41,6 +41,21 @@ namespace Codestellation.SolarWind.Internals
             return false;
         }
 
+        public int DequeueBatch(T[] batch)
+        {
+            lock (_queue)
+            {
+                int itemsToDequeue = Math.Max(batch.Length, _queue.Count);
+
+                for (var i = 0; i < itemsToDequeue; i++)
+                {
+                    _queue.TryDequeue(out batch[i]);
+                }
+
+                return itemsToDequeue;
+            }
+        }
+
 
         public void Dispose(Action<T> dispose)
         {
