@@ -150,6 +150,7 @@ namespace Codestellation.SolarWind.Internals
             socket.NoDelay = options.NoDelay;
             socket.ReceiveTimeout = (int)options.ReceiveTimeout.TotalMilliseconds;
             socket.SendTimeout = (int)options.SendTimeout.TotalMilliseconds;
+            socket.LingerState = new LingerOption(true, 1);
         }
 
         public void Write(in Message message)

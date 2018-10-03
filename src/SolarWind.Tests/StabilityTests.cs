@@ -59,7 +59,7 @@ namespace Codestellation.SolarWind.Tests
             }
 
 
-            _testCompleted.WaitOne(TimeSpan.FromSeconds(60));
+            _testCompleted.WaitOne(TimeSpan.FromSeconds(120));
             watch.Stop();
 
             var expected = new {Client = _clientReceived, Server = _serverReceived};
