@@ -44,6 +44,7 @@ namespace Codestellation.SolarWind.Internals
             _receiveArgs.SetBuffer(segment.Array, segment.Offset, segment.Count);
             if (Socket.ReceiveAsync(_receiveArgs))
             {
+                Console.WriteLine("Started async operation");
                 return await _receiveSource
                     .AwaitValue(cancellation)
                     .ConfigureAwait(false);
@@ -74,12 +75,14 @@ namespace Codestellation.SolarWind.Internals
 
                 if (Socket.SendAsync(_sendArgs))
                 {
+                    Console.WriteLine("Async write");
                     sent += await _sendSource
                         .AwaitValue(cancellationToken)
                         .ConfigureAwait(false);
                 }
                 else
                 {
+                    Console.WriteLine($"Sync write {_sendArgs.SocketError}");
                     //Operation has completed synchronously
                     if (_sendArgs.SocketError == SocketError.Success)
                     {
@@ -97,9 +100,10 @@ namespace Codestellation.SolarWind.Internals
 #endif
         private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
         {
+            Console.WriteLine($"Async callback {e.SocketError}");
             if (e.SocketError == SocketError.Success)
             {
-                _sendSource.SetResult(e.BytesTransferred);
+                Console.WriteLine($"Set result: {_sendSource.SetResult(e.BytesTransferred)}");
             }
             else
             {
@@ -111,7 +115,7 @@ namespace Codestellation.SolarWind.Internals
         {
             if (e.SocketError == SocketError.Success)
             {
-                _receiveSource.SetResult(e.BytesTransferred);
+                Console.WriteLine($"Set result: {_receiveSource.SetResult(e.BytesTransferred)}");
             }
             else
             {

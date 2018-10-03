@@ -64,7 +64,7 @@ namespace Codestellation.SolarWind.Tests
                     Receive(server, buffer, WireHeader.Size);
                     buffer.Position = 0;
                     WireHeader header = WireHeader.ReadFrom(buffer);
-                    //Console.WriteLine(header.MessageHeader);
+                    //Console.WriteLine($"Received {header.MessageHeader} ({header.PayloadSize.Value.ToString(CultureInfo.InvariantCulture)})");
                     Receive(server, buffer, header.PayloadSize.Value);
 
                     _serverReceived++;
@@ -105,22 +105,14 @@ namespace Codestellation.SolarWind.Tests
 
             Console.WriteLine($"Pushed all messages in {watch.ElapsedMilliseconds}");
 
-            var previous = 0;
-            var times = 200;
-
-            while (!_allMessagesReceived.WaitOne(TimeSpan.FromSeconds(1)))
+            for (var times = 0; times < 20; times++)
             {
-                if (--times == 0)
+                if (_allMessagesReceived.WaitOne(TimeSpan.FromSeconds(1)))
                 {
                     break;
                 }
 
-                if (_serverReceived == previous)
-                {
-                    break;
-                }
-
-                previous = _serverReceived;
+                Console.WriteLine($"{times:D3}: received {_serverReceived.ToString(CultureInfo.InvariantCulture)} messages.");
             }
 
             watch.Stop();

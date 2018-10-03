@@ -47,7 +47,8 @@ namespace Codestellation.SolarWind.Internals
             byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
 
             WireHeader.WriteTo(wireHeader, buffer);
-            await _mainStream.WriteAsync(buffer, 0, WireHeader.Size, cancellation).ConfigureAwait(false);
+            var memory = new Memory<byte>(buffer, 0, WireHeader.Size);
+            await _mainStream.WriteAsync(memory, cancellation).ConfigureAwait(false);
             _logger.LogDebug($"Written header {message.Header.ToString()}");
 
             ArrayPool<byte>.Shared.Return(buffer);
@@ -169,6 +170,8 @@ namespace Codestellation.SolarWind.Internals
 
         public void Flush() => _mainStream.Flush();
 
-        public ValueTask FlushAsync(CancellationToken cancellation) => new ValueTask(_mainStream.FlushAsync(cancellation));
+        public Task FlushAsync(CancellationToken cancellation) => _mainStream.FlushAsync(cancellation);
+
+        public void Dispose() => _mainStream.Dispose();
     }
 }

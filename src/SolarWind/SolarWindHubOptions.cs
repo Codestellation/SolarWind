@@ -46,7 +46,7 @@ namespace Codestellation.SolarWind
 
             NoDelay = true;
             SendTimeout = TimeSpan.FromSeconds(10);
-            ReceiveTimeout = TimeSpan.FromSeconds(10);
+            ReceiveTimeout = TimeSpan.FromSeconds(1000);
         }
 
         public SolarWindHubOptions(ILoggerFactory loggerFactory)

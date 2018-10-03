@@ -1,6 +1,6 @@
 using System;
-using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using Microsoft.Extensions.Logging;
@@ -45,8 +45,7 @@ namespace Codestellation.SolarWind
             _reader = new Thread(StartReadingTask);
             _reader.Start();
 
-            _writer = new Thread(StartWritingTask);
-            _writer.Start();
+            Task.Run(StartWritingTask);
         }
 
         /// <summary>
@@ -126,7 +125,7 @@ namespace Codestellation.SolarWind
 
         private void Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count);
 
-        private void StartWritingTask()
+        private async Task StartWritingTask()
         {
             //var batch = new Message[100];
             while (!_cancellationSource.IsCancellationRequested)
@@ -142,11 +141,16 @@ namespace Codestellation.SolarWind
 
                         using (message)
                         {
-                            _connection.Write(message);
-                            //await _connection
-                            //    .WriteAsync(message, _cancellationSource.Token)
-                            //    .ConfigureAwait(false);
-                            _connection.Flush();
+                            string msg = message.Header.ToString();
+                            Console.Write($"Writing {msg}. ");
+                            await _connection
+                                .WriteAsync(message, _cancellationSource.Token)
+                                .ConfigureAwait(false);
+                            Console.Write("Written. ");
+                            await _connection
+                                .FlushAsync(_cancellationSource.Token)
+                                .ConfigureAwait(false);
+                            Console.WriteLine("Flushed.");
                         }
                     }
                 }
@@ -156,7 +160,7 @@ namespace Codestellation.SolarWind
                 }
                 catch (Exception ex)
                 {
-                    Debugger.Break();
+                    //Debugger.Break();
                 }
             }
         }
@@ -176,6 +180,7 @@ namespace Codestellation.SolarWind
             }
 
             _cancellationSource.Cancel();
+            _connection.Dispose();
             //writer must be stopped before stopping reader because reader is responsible for closing socket.  
             //_writer.Wait();
             //_reader.Wait();

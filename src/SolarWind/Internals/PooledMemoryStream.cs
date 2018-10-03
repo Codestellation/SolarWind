@@ -2,7 +2,6 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,7 +41,6 @@ namespace Codestellation.SolarWind.Internals
         {
             _buffers = new LinkedList<byte[]>();
         }
-
 
         public override void Flush()
         {
@@ -236,6 +234,38 @@ namespace Codestellation.SolarWind.Internals
         {
             CopyInto(destination);
             return new ValueTask(Task.CompletedTask);
+        }
+
+        public async ValueTask CopyIntoAsync(AsyncNetworkStream destination, CancellationToken cancellation)
+        {
+            var left = (int)_length;
+            foreach (byte[] buffer in _buffers)
+            {
+                int bytesToCopy = Math.Min(left, buffer.Length);
+                var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesToCopy);
+                await destination.WriteAsync(memory, cancellation);
+                left -= bytesToCopy;
+                if (left == 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        public async ValueTask CopyIntoAsync(DuplexBufferedStream destination, CancellationToken cancellation)
+        {
+            var left = (int)_length;
+            foreach (byte[] buffer in _buffers)
+            {
+                int bytesToCopy = Math.Min(left, buffer.Length);
+                var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesToCopy);
+                await destination.WriteAsync(memory, cancellation);
+                left -= bytesToCopy;
+                if (left == 0)
+                {
+                    break;
+                }
+            }
         }
 
         public void CopyInto(Stream destination)

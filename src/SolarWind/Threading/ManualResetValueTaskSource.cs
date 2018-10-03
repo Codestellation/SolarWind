@@ -6,7 +6,9 @@
 // See https://github.com/dotnet/corefx/blob/df43abbed58fa534a36ad1840ff597efc7b00f85/src/Common/tests/System/Threading/Tasks/Sources/ManualResetValueTaskSource.cs
 
 using System;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
@@ -60,6 +62,7 @@ namespace Codestellation.SolarWind.Threading
                 if (_logic.Completed)
                 {
                     Monitor.Exit(_cancellationCallback);
+                    Debugger.Break();
                     return false;
                 }
 
@@ -68,7 +71,7 @@ namespace Codestellation.SolarWind.Threading
 
                 return true;
             }
-
+            Debugger.Break();
             return false;
         }
 
@@ -77,6 +80,12 @@ namespace Codestellation.SolarWind.Threading
             //If monitor is entered by someone else - we are late, so simply drop results
             if (Monitor.TryEnter(_cancellationCallback))
             {
+                if (_logic.Completed)
+                {
+                    Monitor.Exit(_cancellationCallback);
+                    return;
+                }
+
                 _logic.SetException(error);
                 Monitor.Exit(_cancellationCallback);
             }

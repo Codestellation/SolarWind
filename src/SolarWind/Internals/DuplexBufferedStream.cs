@@ -56,6 +56,7 @@ namespace Codestellation.SolarWind.Internals
                 throw new NotImplementedException();
             }
 
+            //TODO: buffer the data
             return _asyncStream.ReadAsync(to, cancellation);
         }
 #endif
@@ -71,8 +72,9 @@ namespace Codestellation.SolarWind.Internals
 
             _readPos = 0;
             _readLen = 0;
-
+            //TODO: Here's bug:
             _readLen = _inner.Read(_readBuffer, 0, _readBuffer.Length);
+
             if (_readLen == 0) //eof in the inner stream
             {
                 return 0;
@@ -83,33 +85,26 @@ namespace Codestellation.SolarWind.Internals
 
         private int ReadBufferedData(Span<byte> to)
         {
-            int bytesToRead = Math.Min(to.Length, _readLen - _readPos);
+            var bytesToRead = Math.Min(to.Length, _readLen - _readPos);
             var from = new ReadOnlySpan<byte>(_readBuffer, _readPos, bytesToRead);
             from.CopyTo(to);
             _readPos += bytesToRead;
             return from.Length;
         }
 
-        public ValueTask WriteAsync(ReadOnlyMemory<byte> from, CancellationToken cancellation)
+        public async ValueTask WriteAsync(ReadOnlyMemory<byte> from, CancellationToken cancellation)
         {
             if (_asyncStream == null)
             {
                 throw new NotSupportedException();
             }
 
-            return _asyncStream.WriteAsync(from, cancellation);
-        }
-
-        public override void Write(byte[] buffer, int offset, int count) => Write(new ReadOnlySpan<byte>(buffer, offset, count));
-
-        public void Write(ReadOnlySpan<byte> from)
-        {
-            int left = from.Length;
+            var left = from.Length;
             var written = 0;
             do
             {
-                Span<byte> to = new Span<byte>(_writeBuffer).Slice(_writePos);
-                int bytesToWrite = Math.Min(left, to.Length);
+                Memory<byte> to = new Memory<byte>(_writeBuffer).Slice(_writePos);
+                var bytesToWrite = Math.Min(left, to.Length);
 
                 from.Slice(written, bytesToWrite).CopyTo(to);
 
@@ -119,7 +114,35 @@ namespace Codestellation.SolarWind.Internals
 
                 if (_writePos == _writeBuffer.Length)
                 {
-                    InternalFlush();
+                    await FlushAsync(cancellation).ConfigureAwait(false);
+                }
+            } while (left != 0);
+        }
+
+        public override void Write(byte[] buffer, int offset, int count) => Write(new ReadOnlyMemory<byte>(buffer, offset, count));
+
+        public void Write(ReadOnlyMemory<byte> from) => Write(from.Span);
+
+        public void Write(ReadOnlySpan<byte> from)
+        {
+            var left = from.Length;
+            var written = 0;
+            do
+            {
+                Memory<byte> to = new Memory<byte>(_writeBuffer).Slice(_writePos);
+                var bytesToWrite = Math.Min(left, to.Length);
+
+                from
+                    .Slice(written, bytesToWrite)
+                    .CopyTo(to.Span);
+
+                _writePos += bytesToWrite;
+                written += bytesToWrite;
+                left -= bytesToWrite;
+
+                if (_writePos == _writeBuffer.Length)
+                {
+                    Flush();
                 }
             } while (left != 0);
         }
@@ -149,11 +172,10 @@ namespace Codestellation.SolarWind.Internals
 
             var memory = new ReadOnlyMemory<byte>(_writeBuffer, 0, _writePos);
             await _asyncStream.WriteAsync(memory, cancellation).ConfigureAwait(false);
+            _writePos = 0;
         }
 
-        public override void Flush() => InternalFlush();
-
-        private void InternalFlush()
+        public override void Flush()
         {
             if (_writePos == 0)
             {

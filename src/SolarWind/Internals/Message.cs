@@ -17,5 +17,7 @@ namespace Codestellation.SolarWind.Internals
         }
 
         public void Dispose() => Payload?.Dispose();
+
+        public override string ToString() => Header.ToString();
     }
 }
