@@ -127,39 +127,43 @@ namespace Codestellation.SolarWind
 
         private async Task StartWritingTask()
         {
-            //var batch = new Message[100];
+            var batch = new Message[100];
             while (!_cancellationSource.IsCancellationRequested)
             {
                 try
                 {
-                    //Try to dequeue a batch and send and flush after that
-                    //var batchSize = _session.TryDequeueBatch(batch);
+                    int batchLength = _session.TryDequeueBatch(batch);
 
-                    if (_session.TryDequeueAsync(out Message message))
+                    if (batchLength == 0)
                     {
-                        //_logger.LogDebug($"Writing message {message.Header.ToString()}");
-
-                        using (message)
+                        await _session.AwaitOutgoing(_cancellationSource.Token).ConfigureAwait(false);
+                        continue;
+                    }
+                    //TODO: Dispose messages in case of exception
+                    for (var i = 0; i < batchLength; i++)
+                    {
+                        using (Message message = batch[i])
                         {
+                            //_logger.LogDebug($"Writing message {message.Header.ToString()}");
                             await _connection
                                 .WriteAsync(message, _cancellationSource.Token)
                                 .ConfigureAwait(false);
-                            await _connection
-                                .FlushAsync(_cancellationSource.Token)
-                                .ConfigureAwait(false);
-
-                            //Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Flushed.");
                         }
                     }
+                    Array.Clear(batch, 0, batchLength); //Allow GC to collect streams
+
+                    await _connection
+                        .FlushAsync(_cancellationSource.Token)
+                        .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
                     break;
                 }
-                catch (Exception ex)
-                {
-                    //Debugger.Break();
-                }
+                //catch (Exception ex)
+                //{
+                //    //Debugger.Break();
+                //}
             }
         }
 

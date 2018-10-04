@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
+using Codestellation.SolarWind.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
@@ -13,7 +15,7 @@ namespace Codestellation.SolarWind.Internals
 
         private readonly ISerializer _serializer;
         private readonly DeserializationCallback _callback;
-        private readonly ArrayBlockingQueue<Message> _outgoingQueue;
+        private readonly AwaitableQueue<Message> _outgoingQueue;
 
         private MessageId _currentMessageId;
         private readonly ArrayBlockingQueue<Message> _incomingQueue;
@@ -33,7 +35,7 @@ namespace Codestellation.SolarWind.Internals
 
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
             _serializationQueue = new ArrayBlockingQueue<(MessageId id, MessageId replyTo, object data)>();
-            _outgoingQueue = new ArrayBlockingQueue<Message>();
+            _outgoingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceDefaultTaskScheduler);
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
             // message processing as well and thus stop reading all the sockets. 
@@ -142,9 +144,9 @@ namespace Codestellation.SolarWind.Internals
             return id;
         }
 
-        public bool TryDequeueAsync(out Message result) => _outgoingQueue.TryDequeue(out result);
+        public int TryDequeueBatch(Message[] batch) => _outgoingQueue.TryDequeueBatch(batch);
 
-        public int TryDequeueBatch(Message[] batch) => _outgoingQueue.DequeueBatch(batch);
+        public ValueTask AwaitOutgoing(CancellationToken cancellation) => _outgoingQueue.AwaitEnqueued(cancellation);
 
         public void Dispose()
         {

@@ -12,34 +12,51 @@ namespace Codestellation.SolarWind.Threading
     public class AwaitableQueue<T>
     {
         private readonly SimpleQueue<T> _queue;
-        private readonly AutoResetValueTaskSource<T> _source;
+        private readonly AutoResetValueTaskSource<int> _source;
+        private bool _shouldNotify;
 
         public AwaitableQueue(ContinuationOptions options = ContinuationOptions.None)
         {
             _queue = new SimpleQueue<T>(10);
-            _source = new AutoResetValueTaskSource<T>(options);
+            _source = new AutoResetValueTaskSource<int>(options);
+            _shouldNotify = false;
         }
 
         /// <summary>
         /// Puts an instance of T into the <see cref="AwaitableQueue{T}" /> and invokes an awaiter (if any)
         /// </summary>
-        /// <param name="value">An instance of <see cref="T" /></param>
         public void Enqueue(in T value)
         {
             lock (_queue)
             {
-                if (_queue.Count > 0)
-                {
-                    _queue.Enqueue(value);
-                    return;
-                }
-
-                if (_source.SetResult(value))
-                {
-                    return;
-                }
-
                 _queue.Enqueue(value);
+                if (_shouldNotify)
+                {
+                    _source.SetResult(0);
+                    _shouldNotify = false;
+                }
+            }
+        }
+
+        public bool TryDequeue(out T value)
+        {
+            lock (_queue)
+            {
+                return _queue.TryDequeue(out value);
+            }
+        }
+
+        public int TryDequeueBatch(T[] batch)
+        {
+            lock (_queue)
+            {
+                int count = Math.Min(batch.Length, _queue.Count);
+                for (var i = 0; i < count; i++)
+                {
+                    _queue.TryDequeue(out batch[i]);
+                }
+
+                return count;
             }
         }
 
@@ -48,17 +65,17 @@ namespace Codestellation.SolarWind.Threading
         /// </summary>
         /// <param name="cancellation"></param>
         /// <exception cref="OperationCanceledException">Throws if cancellation was requested</exception>
-        /// <returns>Returns an instance of a <see cref="ValueTask{T}" /> which contains the next value in the queue</returns>
-        public ValueTask<T> Await(CancellationToken cancellation)
+        public ValueTask AwaitEnqueued(CancellationToken cancellation)
         {
             lock (_queue)
             {
-                if (_queue.TryDequeue(out T result))
+                if (_queue.Count > 0)
                 {
-                    return new ValueTask<T>(result);
+                    return new ValueTask(Task.CompletedTask);
                 }
 
-                return _source.AwaitValue(cancellation);
+                _shouldNotify = true;
+                return _source.AwaitVoid(cancellation);
             }
         }
 

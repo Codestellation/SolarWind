@@ -35,12 +35,15 @@ namespace Codestellation.SolarWind.Tests.Threading
             _queue.Enqueue(_expected);
 
             //act
-            ValueTask<int> actual = _queue.Await(CancellationToken.None);
+            ValueTask actual = _queue.AwaitEnqueued(CancellationToken.None);
 
             //assert
-            actual.IsCompletedSuccessfully.Should().BeTrue();
-            actual.Result.Should().Be(_expected);
+            actual.IsCompletedSuccessfully.Should().BeTrue(); //Should be return synchronously
+
+            AssertDequeuedMessage();
         }
+
+
 
         [Test]
         public async Task Should_return_item_when_its_available()
@@ -58,15 +61,15 @@ namespace Codestellation.SolarWind.Tests.Threading
             FillSessionAsync();
 
             //act
-            ValueTask<int> actual = _queue.Await(CancellationToken.None);
+            ValueTask actual = _queue.AwaitEnqueued(CancellationToken.None);
             Stopwatch sw = Stopwatch.StartNew();
-            var result = await actual.ConfigureAwait(false);
+            await actual.ConfigureAwait(false);
             sw.Stop();
 
 
             //assert
             Console.WriteLine($"Awaited for {sw.ElapsedMilliseconds:N0} ms.");
-            result.Should().Be(_expected);
+            AssertDequeuedMessage();
         }
 
 
@@ -89,13 +92,13 @@ namespace Codestellation.SolarWind.Tests.Threading
 
             //act
             //assert
-            Assert.ThrowsAsync<TaskCanceledException>(async () => await _queue.Await(source.Token).ConfigureAwait(false));
+            Assert.ThrowsAsync<TaskCanceledException>(async () => await _queue.AwaitEnqueued(source.Token).ConfigureAwait(false));
         }
 
         [Test]
         public void Should_not_set_result_for_value_task_multiple_times_during_awaiting_phase()
         {
-            ValueTask<int> x = _queue.Await(CancellationToken.None);
+            ValueTask x = _queue.AwaitEnqueued(CancellationToken.None);
 
             for (var i = 0; i < 10_000; i++)
             {
@@ -108,22 +111,29 @@ namespace Codestellation.SolarWind.Tests.Threading
         public async Task Should_not_lost_elements()
         {
             const int total = 1_000_000;
-            Task.Run(() =>
-            {
-                for (var i = 0; i < total; i++)
-                {
-                    _queue.Enqueue(i);
-                }
-            });
+            await Task.Run(() =>
+             {
+                 for (var i = 0; i < total; i++)
+                 {
+                     _queue.Enqueue(i);
+                 }
+             });
 
             var expected = 0;
 
             while (expected < total)
             {
-                var actual = await _queue.Await(CancellationToken.None).ConfigureAwait(false);
+                await _queue.AwaitEnqueued(CancellationToken.None).ConfigureAwait(false);
+                _queue.TryDequeue(out int actual).Should().BeTrue();
                 actual.Should().Be(expected);
                 expected++;
             }
+        }
+
+        private void AssertDequeuedMessage()
+        {
+            _queue.TryDequeue(out int actualValue).Should().BeTrue();
+            actualValue.Should().Be(_expected);
         }
     }
 }
