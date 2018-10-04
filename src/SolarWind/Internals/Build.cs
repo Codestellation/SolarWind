@@ -13,7 +13,9 @@ namespace Codestellation.SolarWind.Internals
         /// <returns></returns>
         public static Socket TcpIPv4() => new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
         {
-            NoDelay = true
+            NoDelay = true,
+            ReceiveTimeout = 1000,
+            SendTimeout = 1000
         };
     }
 }

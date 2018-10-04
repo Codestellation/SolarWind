@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace Codestellation.SolarWind.Tests
 {
     [TestFixture]
-    public class StabilityTests
+    public class ClientStabilityTests
     {
         private SolarWindHub _server;
         private Uri _serverUri;

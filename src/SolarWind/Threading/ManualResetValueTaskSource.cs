@@ -59,6 +59,7 @@ namespace Codestellation.SolarWind.Threading
             //If monitor is entered by someone else - we are late, so simply drop results
             if (Monitor.TryEnter(_cancellationCallback))
             {
+                Console.WriteLine($"Lock taken by {Thread.CurrentThread.ManagedThreadId}");
                 if (_logic.Completed)
                 {
                     Monitor.Exit(_cancellationCallback);

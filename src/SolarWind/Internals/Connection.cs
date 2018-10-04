@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
 {
-    internal class Connection
+    internal class Connection : IDisposable
     {
         private readonly AsyncNetworkStream _networkStream;
         private readonly ILogger _logger;
