@@ -139,6 +139,7 @@ namespace Codestellation.SolarWind
                         await _session.AwaitOutgoing(_cancellationSource.Token).ConfigureAwait(false);
                         continue;
                     }
+
                     //TODO: Dispose messages in case of exception
                     for (var i = 0; i < batchLength; i++)
                     {
@@ -150,6 +151,7 @@ namespace Codestellation.SolarWind
                                 .ConfigureAwait(false);
                         }
                     }
+
                     Array.Clear(batch, 0, batchLength); //Allow GC to collect streams
 
                     await _connection
@@ -160,6 +162,7 @@ namespace Codestellation.SolarWind
                 {
                     break;
                 }
+
                 //catch (Exception ex)
                 //{
                 //    //Debugger.Break();

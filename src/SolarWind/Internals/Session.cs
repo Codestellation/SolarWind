@@ -21,10 +21,9 @@ namespace Codestellation.SolarWind.Internals
         private readonly ArrayBlockingQueue<Message> _incomingQueue;
 
         private readonly CancellationTokenSource _disposal;
-        private readonly ArrayBlockingQueue<(MessageId id, MessageId replyTo, object data)> _serializationQueue;
+        private readonly AwaitableQueue<(MessageId id, MessageId replyTo, object data)> _serializationQueue;
 
         private readonly ILogger _logger;
-        private readonly Thread _serializationThread;
         private readonly Thread _deserializationThread;
 
         public Session(ISerializer serializer, DeserializationCallback callback, ILogger logger)
@@ -34,7 +33,7 @@ namespace Codestellation.SolarWind.Internals
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
-            _serializationQueue = new ArrayBlockingQueue<(MessageId id, MessageId replyTo, object data)>();
+            _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ForceDefaultTaskScheduler);
             _outgoingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceDefaultTaskScheduler);
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
@@ -42,44 +41,56 @@ namespace Codestellation.SolarWind.Internals
             _incomingQueue = new ArrayBlockingQueue<Message>();
             _disposal = new CancellationTokenSource();
 
-            _serializationThread = new Thread(StartSerializationTask);
-            _serializationThread.Start();
 
             _deserializationThread = new Thread(StartDeserializationTask);
             _deserializationThread.Start();
+
+            Task.Run(StartSerializationTask);
         }
 
-        private void StartSerializationTask()
+        private async Task StartSerializationTask()
         {
+            var batch = new (MessageId id, MessageId replyTo, object data)[10];
+
             while (!_disposal.IsCancellationRequested)
             {
-                if (!_serializationQueue.TryDequeue(out (MessageId id, MessageId replyTo, object data) tuple))
+                int batchLength = _serializationQueue.TryDequeueBatch(batch);
+
+                if (batchLength == 0)
                 {
+                    await _serializationQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
                     continue;
                 }
 
-                var payload = new PooledMemoryStream();
-                try
+                for (var i = 0; i < batchLength; i++)
                 {
-                    MessageTypeId typeId = _serializer.Serialize(tuple.data, payload);
-                    var header = new MessageHeader(typeId, tuple.id, tuple.replyTo);
-                    var message = new Message(header, payload);
-                    payload.Position = 0;
-                    _outgoingQueue.Enqueue(message);
-                }
-                catch (OperationCanceledException)
-                {
-                    payload.Dispose();
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    payload.Dispose();
-                    if (_logger.IsEnabled(LogLevel.Error))
+                    var payload = new PooledMemoryStream();
+                    try
                     {
-                        _logger.LogError(ex, "Serialization failure.");
+                        (MessageId id, MessageId replyTo, object data) = batch[i];
+                        MessageTypeId typeId = _serializer.Serialize(data, payload);
+                        var header = new MessageHeader(typeId, id, replyTo);
+                        var message = new Message(header, payload);
+                        payload.Position = 0;
+                        _outgoingQueue.Enqueue(message);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        payload.Dispose();
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        //TODO: Put a message into incoming queue to notify about serialization failure
+                        payload.Dispose();
+                        if (_logger.IsEnabled(LogLevel.Error))
+                        {
+                            _logger.LogError(ex, "Serialization failure.");
+                        }
                     }
                 }
+
+                Array.Clear(batch, 0, batchLength); //free incoming object
             }
         }
 
