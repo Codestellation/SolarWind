@@ -105,7 +105,7 @@ namespace Codestellation.SolarWind.Tests
 
             Console.WriteLine($"Pushed all messages in {watch.ElapsedMilliseconds}");
 
-            for (var times = 0; times < 20; times++)
+            for (var times = 0; times < 200; times++)
             {
                 if (_allMessagesReceived.WaitOne(TimeSpan.FromSeconds(1)))
                 {

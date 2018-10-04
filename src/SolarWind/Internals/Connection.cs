@@ -54,7 +54,7 @@ namespace Codestellation.SolarWind.Internals
             ArrayPool<byte>.Shared.Return(buffer);
             _logger.LogDebug($"Writing payload {message.Header.ToString()}");
 
-            await message.Payload.CopyIntoAsync(_mainStream, cancellation);
+            await message.Payload.CopyIntoAsync(_mainStream, cancellation).ConfigureAwait(false);
 
             _logger.LogDebug($"Written payload {message.Header.ToString()}");
         }

@@ -141,16 +141,14 @@ namespace Codestellation.SolarWind
 
                         using (message)
                         {
-                            string msg = message.Header.ToString();
-                            Console.Write($"Writing {msg}. ");
                             await _connection
                                 .WriteAsync(message, _cancellationSource.Token)
                                 .ConfigureAwait(false);
-                            Console.Write("Written. ");
                             await _connection
                                 .FlushAsync(_cancellationSource.Token)
                                 .ConfigureAwait(false);
-                            Console.WriteLine("Flushed.");
+
+                            //Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Flushed.");
                         }
                     }
                 }

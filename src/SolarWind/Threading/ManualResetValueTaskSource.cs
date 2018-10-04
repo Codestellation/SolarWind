@@ -6,9 +6,7 @@
 // See https://github.com/dotnet/corefx/blob/df43abbed58fa534a36ad1840ff597efc7b00f85/src/Common/tests/System/Threading/Tasks/Sources/ManualResetValueTaskSource.cs
 
 using System;
-using System.Diagnostics;
 using System.Runtime.ExceptionServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
@@ -57,23 +55,38 @@ namespace Codestellation.SolarWind.Threading
         public bool SetResult(in T result)
         {
             //If monitor is entered by someone else - we are late, so simply drop results
-            if (Monitor.TryEnter(_cancellationCallback))
+            lock (_cancellationCallback)
             {
-                Console.WriteLine($"Lock taken by {Thread.CurrentThread.ManagedThreadId}");
                 if (_logic.Completed)
                 {
-                    Monitor.Exit(_cancellationCallback);
-                    Debugger.Break();
+                    //Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Another thread already completed the logic");
                     return false;
                 }
 
                 _logic.SetResult(result);
-                Monitor.Exit(_cancellationCallback);
-
+                //Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Successfully completed");
                 return true;
             }
-            Debugger.Break();
-            return false;
+
+            //if (Monitor.TryEnter(_cancellationCallback))
+            //{
+            //    Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Lock taken");
+
+            //    if (_logic.Completed)
+            //    {
+            //        Monitor.Exit(_cancellationCallback);
+            //        Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Lock released");
+            //        return false;
+            //    }
+
+            //    _logic.SetResult(result);
+            //    Monitor.Exit(_cancellationCallback);
+            //    Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Lock released");
+            //    return true;
+            //}
+            //Debugger.Break();
+            //Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Lock was not taken");
+            //return false;
         }
 
         public void SetException(Exception error)
