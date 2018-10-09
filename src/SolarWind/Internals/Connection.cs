@@ -23,9 +23,19 @@ namespace Codestellation.SolarWind.Internals
             _mainStream = new DuplexBufferedStream(_networkStream);
         }
 
-        public async ValueTask Receive(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
+        internal void Receive(PooledMemoryStream readBuffer, int bytesToReceive)
         {
-            int left = bytesToReceive;
+            var left = bytesToReceive;
+
+            while (left != 0)
+            {
+                left -= readBuffer.Write(_mainStream, bytesToReceive);
+            }
+        }
+
+        public async ValueTask ReceiveAsync(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
+        {
+            var left = bytesToReceive;
 
             while (left != 0)
             {
@@ -38,7 +48,6 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        public void Close() => _mainStream.Close();
 
         public async ValueTask WriteAsync(Message message, CancellationToken cancellation)
         {
@@ -136,15 +145,6 @@ namespace Codestellation.SolarWind.Internals
             onConnected(remoteUri, handshakeResponse.HubId, connection);
         }
 
-        internal void Receive(PooledMemoryStream readBuffer, int bytesToReceive)
-        {
-            int left = bytesToReceive;
-
-            while (left != 0)
-            {
-                left -= readBuffer.Write(_mainStream, bytesToReceive);
-            }
-        }
 
         private static void ConfigureSocket(Socket socket, SolarWindHubOptions options)
         {
@@ -172,6 +172,10 @@ namespace Codestellation.SolarWind.Internals
 
         public Task FlushAsync(CancellationToken cancellation) => _mainStream.FlushAsync(cancellation);
 
-        public void Dispose() => _mainStream.Dispose();
+        public void Dispose()
+        {
+            _mainStream.Close();
+            _mainStream.Dispose();
+        }
     }
 }

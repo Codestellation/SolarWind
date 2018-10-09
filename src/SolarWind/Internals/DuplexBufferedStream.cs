@@ -45,19 +45,36 @@ namespace Codestellation.SolarWind.Internals
                 return _inner.ReadAsync(buffer, offset, count, cancellation);
             }
 
-            return ReadAsync(new Memory<byte>(buffer, offset, count), cancellation).AsTask();
+            var to = new Memory<byte>(buffer, offset, count);
+            return _asyncStream.ReadAsync(to, cancellation).AsTask();
         }
 
 #if NETSTANDARD2_0
-        public ValueTask<int> ReadAsync(Memory<byte> to, CancellationToken cancellation)
+        public async ValueTask<int> ReadAsync(Memory<byte> to, CancellationToken cancellation)
         {
             if (_asyncStream == null)
             {
                 throw new NotImplementedException();
             }
 
-            //TODO: buffer the data
-            return _asyncStream.ReadAsync(to, cancellation);
+            //Some data is already buffered
+            if (_readPos < _readLen)
+            {
+                return ReadBufferedData(to.Span);
+            }
+
+            _readPos = 0;
+            _readLen = 0;
+            var memory = new Memory<byte>(_readBuffer, 0, _readBuffer.Length);
+            //TODO: Here's bug: in case of exception stream will be left in inconsistent state
+            _readLen = await _asyncStream.ReadAsync(memory, cancellation).ConfigureAwait(false);
+
+            if (_readLen == 0) //eof in the inner stream
+            {
+                return 0;
+            }
+
+            return ReadBufferedData(to.Span);
         }
 #endif
         public override int Read(byte[] buffer, int offset, int count) => Read(new Span<byte>(buffer, offset, count));
@@ -72,7 +89,7 @@ namespace Codestellation.SolarWind.Internals
 
             _readPos = 0;
             _readLen = 0;
-            //TODO: Here's bug:
+            //TODO: Here's bug: in case of exception stream will be left in inconsistent state??
             _readLen = _inner.Read(_readBuffer, 0, _readBuffer.Length);
 
             if (_readLen == 0) //eof in the inner stream

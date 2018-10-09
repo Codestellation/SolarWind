@@ -228,7 +228,59 @@ namespace Codestellation.SolarWind.Internals
             return count - left;
         }
 
-        public ValueTask<int> WriteAsync(Stream from, int count, CancellationToken cancellation) => new ValueTask<int>(Write(from, count));
+        public async ValueTask<int> WriteAsync(DuplexBufferedStream from, int count, CancellationToken cancellation)
+        {
+            if (count == 0)
+            {
+                return 0;
+            }
+
+            var lastRead = 0;
+            int left = count;
+
+            do
+            {
+                var memory = GetWritableMemory(left);
+                lastRead = await from.ReadAsync(memory, cancellation).ConfigureAwait(false);
+                left -= lastRead;
+                _position += lastRead;
+            } while (left != 0 && lastRead > 0);
+
+            if (_position > _length)
+            {
+                _length = _position;
+            }
+
+            return count - left;
+        }
+
+
+        public async ValueTask<int> WriteAsync(Stream from, int count, CancellationToken cancellation)
+        {
+            if (count == 0)
+            {
+                return 0;
+            }
+
+            var lastRead = 0;
+            int left = count;
+
+            do
+            {
+                MemoryMarshal.TryGetArray(GetWritableMemory(left), out ArraySegment<byte> segment);
+                int bytesToRead = Math.Min(count, segment.Count);
+                lastRead = await from.ReadAsync(segment.Array, segment.Offset, bytesToRead, cancellation).ConfigureAwait(false);
+                left -= lastRead;
+                _position += lastRead;
+            } while (left != 0 && lastRead > 0);
+
+            if (_position > _length)
+            {
+                _length = _position;
+            }
+
+            return count - left;
+        }
 
         public ValueTask CopyIntoAsync(Stream destination, CancellationToken cancellation)
         {

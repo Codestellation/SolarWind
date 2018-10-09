@@ -28,9 +28,8 @@ namespace Codestellation.SolarWind.Internals
         }
 
 #if NETSTANDARD2_0
-        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellation)
-            => await ReadAsync(new Memory<byte>(buffer, offset, count), cancellation)
-                .ConfigureAwait(false);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellation)
+            => ReadAsync(new Memory<byte>(buffer, offset, count), cancellation).AsTask();
 
         //See comments at the top
 
@@ -64,11 +63,11 @@ namespace Codestellation.SolarWind.Internals
                 throw new InvalidOperationException("Non array base memory is supported for .net core 2.1+ only");
             }
 
-            int left = from.Length;
+            var left = from.Length;
             var sent = 0;
             while (left != 0)
             {
-                int realOffset = segment.Offset + sent;
+                var realOffset = segment.Offset + sent;
 
                 _sendArgs.SetBuffer(segment.Array, realOffset, left);
 
@@ -115,7 +114,7 @@ namespace Codestellation.SolarWind.Internals
         {
             if (e.SocketError == SocketError.Success)
             {
-                bool result = _receiveSource.SetResult(e.BytesTransferred);
+                var result = _receiveSource.SetResult(e.BytesTransferred);
                 //Console.WriteLine($"Set result: {result}");
             }
             else

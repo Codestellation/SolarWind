@@ -18,13 +18,12 @@ namespace Codestellation.SolarWind.Internals
         private readonly AwaitableQueue<Message> _outgoingQueue;
 
         private MessageId _currentMessageId;
-        private readonly ArrayBlockingQueue<Message> _incomingQueue;
+        private readonly AwaitableQueue<Message> _incomingQueue;
 
         private readonly CancellationTokenSource _disposal;
         private readonly AwaitableQueue<(MessageId id, MessageId replyTo, object data)> _serializationQueue;
 
         private readonly ILogger _logger;
-        private readonly Thread _deserializationThread;
 
         public Session(ISerializer serializer, DeserializationCallback callback, ILogger logger)
         {
@@ -38,14 +37,11 @@ namespace Codestellation.SolarWind.Internals
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
             // message processing as well and thus stop reading all the sockets. 
-            _incomingQueue = new ArrayBlockingQueue<Message>();
+            _incomingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceDefaultTaskScheduler);
             _disposal = new CancellationTokenSource();
 
-
-            _deserializationThread = new Thread(StartDeserializationTask);
-            _deserializationThread.Start();
-
             Task.Run(StartSerializationTask);
+            Task.Run(StartDeserializationTask);
         }
 
         private async Task StartSerializationTask()
@@ -94,43 +90,53 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        private void StartDeserializationTask()
+        private async Task StartDeserializationTask()
         {
-            //TODO: Handle exception to avoid exiting deserialization thread
             //TODO: Implement graceful shutdown
+
+            var batch = new Message[10];
+
+
             while (!_disposal.IsCancellationRequested)
             {
-                if (!_incomingQueue.TryDequeue(out Message incoming))
+                int batchLength = _incomingQueue.TryDequeueBatch(batch);
+
+                if (batchLength == 0)
                 {
+                    await _incomingQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
                     continue;
                 }
 
-                object data;
-                try
+                for (var i = 0; i < batchLength; i++)
                 {
-                    data = _serializer.Deserialize(incoming.Header, incoming.Payload);
-                    incoming.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    if (_logger.IsEnabled(LogLevel.Error))
+                    Message incoming = batch[i];
+                    object data;
+                    try
                     {
-                        _logger.LogError(ex, $"Deserialization failure. {incoming.Header.ToString()}");
+                        data = _serializer.Deserialize(incoming.Header, incoming.Payload);
+                        incoming.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        if (_logger.IsEnabled(LogLevel.Error))
+                        {
+                            _logger.LogError(ex, $"Deserialization failure. {incoming.Header.ToString()}");
+                        }
+
+                        incoming.Dispose();
+                        continue;
                     }
 
-                    incoming.Dispose();
-                    continue;
-                }
-
-                try
-                {
-                    _callback(incoming.Header, data);
-                }
-                catch (Exception ex)
-                {
-                    if (_logger.IsEnabled(LogLevel.Error))
+                    try
                     {
-                        _logger.LogError(ex, $"Failure during callback. {incoming.Header.ToString()}");
+                        _callback(incoming.Header, data);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (_logger.IsEnabled(LogLevel.Error))
+                        {
+                            _logger.LogError(ex, $"Failure during callback. {incoming.Header.ToString()}");
+                        }
                     }
                 }
             }

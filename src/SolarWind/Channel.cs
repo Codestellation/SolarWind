@@ -15,8 +15,6 @@ namespace Codestellation.SolarWind
         private Connection _connection;
         private readonly ChannelOptions _options;
 
-        private Thread _reader;
-        private Thread _writer;
         private CancellationTokenSource _cancellationSource;
         private readonly Session _session;
         private SolarWindCallback _callback;
@@ -42,9 +40,8 @@ namespace Codestellation.SolarWind
             Stop();
             _cancellationSource = new CancellationTokenSource();
             _connection = connection;
-            _reader = new Thread(StartReadingTask);
-            _reader.Start();
 
+            Task.Run(StartReadingTask);
             Task.Run(StartWritingTask);
         }
 
@@ -64,28 +61,26 @@ namespace Codestellation.SolarWind
         public void SetCallback(SolarWindCallback callback)
             => _callback = callback ?? throw new ArgumentNullException(nameof(callback));
 
-        private void StartReadingTask()
+        private async Task StartReadingTask()
         {
             while (!_cancellationSource.IsCancellationRequested)
             {
-                Receive();
+                await Receive().ConfigureAwait(false);
             }
-
-            _connection.Close();
         }
 
-        private void Receive()
+        private async ValueTask Receive()
         {
             var buffer = new PooledMemoryStream();
             Message message;
             try
             {
-                Receive(buffer, WireHeader.Size);
+                await Receive(buffer, WireHeader.Size).ConfigureAwait(false);
                 buffer.Position = 0;
                 WireHeader wireHeader = WireHeader.ReadFrom(buffer);
                 buffer.Reset();
 
-                Receive(buffer, wireHeader.PayloadSize.Value);
+                await Receive(buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
                 buffer.Position = 0;
                 message = new Message(wireHeader.MessageHeader, buffer);
             }
@@ -123,7 +118,7 @@ namespace Codestellation.SolarWind
             }
         }
 
-        private void Receive(PooledMemoryStream buffer, int count) => _connection.Receive(buffer, count);
+        private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.ReceiveAsync(buffer, count, _cancellationSource.Token);
 
         private async Task StartWritingTask()
         {
@@ -132,7 +127,7 @@ namespace Codestellation.SolarWind
             {
                 try
                 {
-                    int batchLength = _session.TryDequeueBatch(batch);
+                    var batchLength = _session.TryDequeueBatch(batch);
 
                     if (batchLength == 0)
                     {

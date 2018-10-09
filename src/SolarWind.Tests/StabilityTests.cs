@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading;
 using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
@@ -58,13 +59,22 @@ namespace Codestellation.SolarWind.Tests
                 _channelToServer.Post(new TextMessage {Text = "Hello, server!"});
             }
 
+            GCStats before = GCStats.Snapshot();
+            for (var times = 0; times < 120; times++)
+            {
+                if (_testCompleted.WaitOne(TimeSpan.FromSeconds(1)))
+                {
+                    break;
+                }
 
-            _testCompleted.WaitOne(TimeSpan.FromSeconds(120));
+                Console.WriteLine($"{times:D3}: Server={_serverReceived.ToString(CultureInfo.InvariantCulture)} Client={_clientReceived.ToString(CultureInfo.InvariantCulture)} messages.");
+            }
+
             watch.Stop();
-
+            GCStats diff = before.Diff();
             var expected = new {Client = _clientReceived, Server = _serverReceived};
             var actual = new {Client = _count, Server = _count};
-
+            Console.WriteLine(diff);
             expected.Should().BeEquivalentTo(actual);
 
             Console.WriteLine($"Finished in {watch.ElapsedMilliseconds:N3} ms, perf {_count * 1000.0 / watch.ElapsedMilliseconds:N} msg/sec");

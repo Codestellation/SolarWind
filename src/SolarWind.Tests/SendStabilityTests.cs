@@ -79,7 +79,7 @@ namespace Codestellation.SolarWind.Tests
 
         internal void Receive(NetworkStream from, PooledMemoryStream to, int bytesToReceive)
         {
-            int left = bytesToReceive;
+            var left = bytesToReceive;
             while (left != 0)
             {
                 left -= to.Write(from, bytesToReceive);
@@ -104,8 +104,8 @@ namespace Codestellation.SolarWind.Tests
             }
 
             Console.WriteLine($"Pushed all messages in {watch.ElapsedMilliseconds}");
-
-            for (var times = 0; times < 200; times++)
+            GCStats before = GCStats.Snapshot();
+            for (var times = 0; times < 60; times++)
             {
                 if (_allMessagesReceived.WaitOne(TimeSpan.FromSeconds(1)))
                 {
@@ -116,8 +116,9 @@ namespace Codestellation.SolarWind.Tests
             }
 
             watch.Stop();
-
+            GCStats diff = before.Diff();
             Console.WriteLine($"Finished in {watch.ElapsedMilliseconds:N3} ms, perf {_count * 1000.0 / watch.ElapsedMilliseconds:N} msg/sec");
+            Console.WriteLine(diff);
 
             _serverReceived.Should().Be(_count + 1);
         }
