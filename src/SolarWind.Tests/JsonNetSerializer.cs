@@ -7,6 +7,8 @@ namespace Codestellation.SolarWind.Tests
 {
     public class JsonNetSerializer : ISerializer
     {
+        public static readonly JsonNetSerializer Instance = new JsonNetSerializer();
+
         private readonly JsonSerializer _serializer;
 
         public JsonNetSerializer()
