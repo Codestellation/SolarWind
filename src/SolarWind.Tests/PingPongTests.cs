@@ -25,16 +25,15 @@ namespace Codestellation.SolarWind.Tests
         {
             _serverUri = new Uri("tcp://localhost:4312");
 
-            var jsonNetSerializer = new JsonNetSerializer();
 
             var solarWindHubOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
             _server = new SolarWindHub(solarWindHubOptions);
 
-            _server.Listen(new ServerOptions(_serverUri, _ => new ChannelOptions(jsonNetSerializer, OnServerCallback), delegate { }));
+            _server.Listen(new ServerOptions(_serverUri, _ => new ChannelOptions(JsonNetSerializer.Instance, OnServerCallback), delegate { }));
 
             var clientOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
             _client = new SolarWindHub(clientOptions);
-            _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(jsonNetSerializer, OnClientCallback));
+            _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(JsonNetSerializer.Instance, OnClientCallback));
 
             _serverReceivedMessage = new ManualResetEvent(false);
             _clientReceivedMessage = new ManualResetEvent(false);

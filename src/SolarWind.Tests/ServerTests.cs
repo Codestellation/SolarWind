@@ -23,17 +23,15 @@ namespace Codestellation.SolarWind.Tests
         private Uri _uri;
         private MemoryStream _messageBuffer;
         private HubId _clientHubId;
-        private JsonNetSerializer _serializer;
 
         [SetUp]
         public void Setup()
         {
-            _serializer = new JsonNetSerializer();
             var options = new SolarWindHubOptions(TestContext.LoggerFactory);
 
             _hub = new SolarWindHub(options);
             _uri = new Uri("tcp://localhost:4312");
-            _hub.Listen(new ServerOptions(_uri, _ => new ChannelOptions(_serializer, OnCallback), delegate { }));
+            _hub.Listen(new ServerOptions(_uri, _ => new ChannelOptions(JsonNetSerializer.Instance, OnCallback), delegate { }));
 
 
             var header = new MessageHeader(new MessageTypeId(1), MessageId.Empty, MessageId.Empty);
@@ -41,7 +39,7 @@ namespace Codestellation.SolarWind.Tests
 
             _messageBuffer = new MemoryStream();
 
-            _serializer.SerializeMessage(_messageBuffer, in header, data);
+            JsonNetSerializer.Instance.SerializeMessage(_messageBuffer, in header, data);
 
             _clientHubId = new HubId("client");
         }

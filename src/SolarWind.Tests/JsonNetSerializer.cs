@@ -11,7 +11,7 @@ namespace Codestellation.SolarWind.Tests
 
         private readonly JsonSerializer _serializer;
 
-        public JsonNetSerializer()
+        private JsonNetSerializer()
         {
             _serializer = new JsonSerializer();
         }
