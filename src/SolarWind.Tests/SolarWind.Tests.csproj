@@ -20,6 +20,9 @@
     <ProjectReference Include="..\SolarWind\SolarWind.csproj" />
   </ItemGroup>
 
-  
+  <PropertyGroup>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
 
 </Project>

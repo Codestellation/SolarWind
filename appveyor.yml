@@ -23,23 +23,23 @@ artifacts:
 deploy: off
 
 for:
--  
+-
   branches:
     only:
        - master
 
   deploy:
     - provider: NuGet
-      api_key: 
-        secure: z44CwwunvCyTy8Rk0BplABnNnahqkpfnS/rbHLo2uFrvFhQ7QvsR5mKkceqM/qou
+      api_key:
+        secure: j8FJm6D/lMnLTBJeRwa08RNDi1cZs+junq4tZsN4vDGTtkmncomdltTbhB86IpoD
 
 -
   branches:
-    only: 
+    only:
       - dev
 
   deploy:
     - provider: NuGet
       server: https://www.myget.org/F/codestellation/api/v2/package
-      api_key: 
+      api_key:
         secure: sJ2aZzbtBoHsDlBJ7A7D62AVhDtXKZqWt30LWICqgpzALm0bEIGl96SfLg+Uoa3o
