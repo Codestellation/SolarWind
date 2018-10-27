@@ -88,10 +88,10 @@ namespace Codestellation.SolarWind
             {
                 if (!(ex is OperationCanceledException))
                 {
-                    //if (_logger.IsEnabled(LogLevel.Error))
-                    //{
-                    //    _logger.LogError(ex, "Error during receive");
-                    //}
+                    if (_logger.IsEnabled(LogLevel.Error))
+                    {
+                        _logger.LogError(ex, "Receive error");
+                    }
                 }
                 //if(ex is SocketException sex && sex.ErrorCode == SocketError.TimedOut)
 

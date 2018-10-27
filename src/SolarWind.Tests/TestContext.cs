@@ -1,11 +1,12 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Console;
 
 namespace Codestellation.SolarWind.Tests
 {
     public static class TestContext
     {
-        //public static readonly ILoggerFactory LoggerFactory = new LoggerFactory(new ILoggerProvider[] {new ConsoleLoggerProvider((s, level) => true, false)});
-        public static readonly ILoggerFactory LoggerFactory = new NullLoggerFactory();
+        public static readonly ILoggerFactory LoggerFactory = new LoggerFactory(new ILoggerProvider[] {new ConsoleLoggerProvider((s, level) => true, false)});
+        //public static readonly ILoggerFactory LoggerFactory = new NullLoggerFactory();
     }
 }

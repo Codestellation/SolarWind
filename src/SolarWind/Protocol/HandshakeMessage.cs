@@ -17,7 +17,7 @@ namespace Codestellation.SolarWind.Protocol
 
         public static HandshakeMessage ReadFrom(byte[] buffer, int count)
         {
-            string value = Encoding.UTF8.GetString(buffer, 0, count);
+            var value = Encoding.UTF8.GetString(buffer, 0, count);
             var id = new HubId(value);
             return new HandshakeMessage(id);
         }
@@ -26,7 +26,7 @@ namespace Codestellation.SolarWind.Protocol
         {
             using (var reader = new StreamReader(buffer, Encoding.UTF8, false, 16, true))
             {
-                string value = reader.ReadToEnd();
+                var value = reader.ReadToEnd();
                 var id = new HubId(value);
                 return new HandshakeMessage(id);
             }

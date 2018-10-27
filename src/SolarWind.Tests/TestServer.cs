@@ -7,27 +7,27 @@ using Codestellation.SolarWind.Protocol;
 
 namespace Codestellation.SolarWind.Tests
 {
-    public class TestServer
+    public class TestServer : IDisposable
     {
         private readonly Action<MessageHeader, PooledMemoryStream> _callback;
         private readonly Socket _listener;
 
-        public TestServer(Action<MessageHeader, PooledMemoryStream> callback)
+        public Uri ListenAt => new Uri($"tcp://localhost:{((IPEndPoint)_listener.LocalEndPoint).Port}");
+
+        public TestServer(Action<MessageHeader, PooledMemoryStream> callback, int port = 0)
         {
             _callback = callback;
             _listener = Build.TcpIPv4();
-            _listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            _listener.Bind(new IPEndPoint(IPAddress.Loopback, port));
             _listener.Listen(10);
             Task.Run(StartListener);
         }
-
-        public Uri ListenAt => new Uri($"tcp://localhost:{((IPEndPoint)_listener.LocalEndPoint).Port}");
 
         private void StartListener()
         {
             var server = new AsyncNetworkStream(_listener.Accept());
             HandshakeMessage handshake = server.ReceiveHandshake().Result;
-
+            Console.WriteLine(handshake.HubId);
             server.SendHandshake(HubId.Generate());
 
             using (var buffer = new PooledMemoryStream())
@@ -48,7 +48,7 @@ namespace Codestellation.SolarWind.Tests
             }
         }
 
-        internal void Receive(NetworkStream from, PooledMemoryStream to, int bytesToReceive)
+        private void Receive(NetworkStream from, PooledMemoryStream to, int bytesToReceive)
         {
             var left = bytesToReceive;
             while (left != 0)

@@ -6,6 +6,7 @@ using System.Threading;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
+using JetBrains.dotMemoryUnit;
 using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
@@ -55,6 +56,7 @@ namespace Codestellation.SolarWind.Tests
             }
         }
 
+        [DotMemoryUnit(CollectAllocations=true)]
         [Test]
         public void Should_deliver_a_bunch_of_messages_to_server()
         {
