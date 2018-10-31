@@ -45,8 +45,8 @@ namespace Codestellation.SolarWind
             LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
 
             NoDelay = true;
-            SendTimeout = TimeSpan.FromSeconds(10);
-            ReceiveTimeout = TimeSpan.FromSeconds(1000);
+            SendTimeout = TimeSpan.FromSeconds(1);
+            ReceiveTimeout = TimeSpan.FromSeconds(1);
         }
 
         public SolarWindHubOptions(ILoggerFactory loggerFactory)
@@ -60,7 +60,7 @@ namespace Codestellation.SolarWind
         {
             if (value < TimeSpan.Zero && value != Timeout.InfiniteTimeSpan)
             {
-                string message = $"Must be greater than or equal to {nameof(TimeSpan)}.{nameof(TimeSpan.Zero)} equal to {nameof(Timeout)}.{nameof(Timeout.InfiniteTimeSpan)}";
+                var message = $"Must be greater than or equal to {nameof(TimeSpan)}.{nameof(TimeSpan.Zero)} equal to {nameof(Timeout)}.{nameof(Timeout.InfiniteTimeSpan)}";
                 throw new ArgumentOutOfRangeException(nameof(value), message);
             }
 

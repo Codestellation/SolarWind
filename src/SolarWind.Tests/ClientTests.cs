@@ -11,19 +11,18 @@ namespace Codestellation.SolarWind.Tests
     public class ClientTests
     {
         private SolarWindHub _client;
-        private AutoResetEvent _received;
+        private CountdownEvent _received;
 
         [SetUp]
         public void Setup()
         {
             var clientOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
             _client = new SolarWindHub(clientOptions);
-            _received = new AutoResetEvent(false);
+            _received = new CountdownEvent(1);
         }
 
         [TearDown]
         public void Teardown() => _client?.Dispose();
-
 
 
         [Test]
@@ -31,27 +30,29 @@ namespace Codestellation.SolarWind.Tests
         {
             const int port = 4564;
             var options = new ChannelOptions(JsonNetSerializer.Instance, delegate { });
-            var channel = _client.OpenChannelTo(new Uri($"tcp://localhost:{port}"), options);
+            Channel channel = _client.OpenChannelTo(new Uri($"tcp://localhost:{port}"), options);
 
-            SendMessage(port, channel);
-            Thread.Sleep(10*1000);
-            SendMessage(port, channel);
+            SendMessage(port, channel, "Did not receive the first message");
+            Thread.Sleep(5 * 1000);
+            SendMessage(port, channel, "Did not receive the second message");
         }
 
-        private void SendMessage(int port, Channel channel)
+        private void SendMessage(int port, Channel channel, string message)
         {
             using (new TestServer(OnReceived, port))
             {
                 channel.Post(TextMessage.New());
 
-                _received.WaitOne(TimeSpan.FromSeconds(1)).Should().BeTrue("Did not receive the first message");
+                _received.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)).Should().BeTrue(message);
+
+                _received.Reset();
             }
         }
 
         private void OnReceived(MessageHeader header, PooledMemoryStream payload)
         {
             Console.WriteLine(header);
-            _received.Set();
+            _received.Signal();
         }
     }
 }

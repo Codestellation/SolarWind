@@ -181,14 +181,14 @@ namespace Codestellation.SolarWind.Internals
 
             if (_asyncStream == null)
             {
-                Task task = _inner.WriteAsync(_writeBuffer, 0, _writePos, cancellation);
-                _writePos = 0;
-                await task.ConfigureAwait(false);
-                return;
+                await _inner.WriteAsync(_writeBuffer, 0, _writePos, cancellation).ConfigureAwait(false);
+            }
+            else
+            {
+                var memory = new ReadOnlyMemory<byte>(_writeBuffer, 0, _writePos);
+                await _asyncStream.WriteAsync(memory, cancellation).ConfigureAwait(false);
             }
 
-            var memory = new ReadOnlyMemory<byte>(_writeBuffer, 0, _writePos);
-            await _asyncStream.WriteAsync(memory, cancellation).ConfigureAwait(false);
             _writePos = 0;
         }
 

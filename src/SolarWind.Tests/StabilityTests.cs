@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Threading;
 using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
@@ -26,12 +27,12 @@ namespace Codestellation.SolarWind.Tests
         {
             _serverUri = new Uri("tcp://localhost:4312");
 
-            var solarWindHubOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
+            var solarWindHubOptions = new SolarWindHubOptions(NullLoggerFactory.Instance);
             _server = new SolarWindHub(solarWindHubOptions);
 
             _server.Listen(new ServerOptions(_serverUri, _ => new ChannelOptions(JsonNetSerializer.Instance, OnServerCallback), delegate { }));
 
-            var clientOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
+            var clientOptions = new SolarWindHubOptions(NullLoggerFactory.Instance);
             _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_serverUri, new ChannelOptions(JsonNetSerializer.Instance, OnClientCallback));
 

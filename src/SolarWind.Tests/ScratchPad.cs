@@ -1,6 +1,3 @@
-using System;
-using System.Buffers;
-using System.IO;
 using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
@@ -10,8 +7,6 @@ namespace Codestellation.SolarWind.Tests
         [Test]
         public void Test()
         {
-            
-            
         }
     }
 }

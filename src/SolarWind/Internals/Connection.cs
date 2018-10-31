@@ -12,26 +12,21 @@ namespace Codestellation.SolarWind.Internals
     {
         private readonly AsyncNetworkStream _networkStream;
         private readonly ILogger _logger;
+        private readonly Action _reconnect;
         private readonly DuplexBufferedStream _mainStream;
 
 
-        private Connection(AsyncNetworkStream networkStream, ILogger logger)
+        private Connection(AsyncNetworkStream networkStream, ILogger logger, Action reconnect)
         {
             _networkStream = networkStream ?? throw new ArgumentNullException(nameof(networkStream));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _reconnect = reconnect;
 
             _mainStream = new DuplexBufferedStream(_networkStream);
         }
 
-        internal void Receive(PooledMemoryStream readBuffer, int bytesToReceive)
-        {
-            var left = bytesToReceive;
+        public void Reconnect() => _reconnect?.Invoke();
 
-            while (left != 0)
-            {
-                left -= readBuffer.Write(_mainStream, bytesToReceive);
-            }
-        }
 
         public async ValueTask ReceiveAsync(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
@@ -92,7 +87,7 @@ namespace Codestellation.SolarWind.Internals
             HandshakeMessage incoming = await networkStream
                 .HandshakeAsServer(options.HubId)
                 .ConfigureAwait(false);
-            var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>());
+            var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>(), null);
             onAccepted(incoming.HubId, connection);
         }
 
@@ -141,7 +136,11 @@ namespace Codestellation.SolarWind.Internals
             HandshakeMessage handshakeResponse = await networkStream
                 .HandshakeAsClient(options.HubId)
                 .ConfigureAwait(false);
-            var connection = new Connection(networkStream, logger);
+
+
+            Action reconnect = () => ConnectTo(options, remoteUri, logger, onConnected);
+
+            var connection = new Connection(networkStream, logger, reconnect);
             onConnected(remoteUri, handshakeResponse.HubId, connection);
         }
 

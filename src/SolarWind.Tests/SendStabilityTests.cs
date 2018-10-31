@@ -7,6 +7,7 @@ using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
 using JetBrains.dotMemoryUnit;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
 namespace Codestellation.SolarWind.Tests
@@ -19,7 +20,7 @@ namespace Codestellation.SolarWind.Tests
         {
             _server = new TestServer(OnServerReceived);
 
-            var clientOptions = new SolarWindHubOptions(TestContext.LoggerFactory);
+            var clientOptions = new SolarWindHubOptions(NullLoggerFactory.Instance);
             _client = new SolarWindHub(clientOptions);
             _channelToServer = _client.OpenChannelTo(_server.ListenAt, new ChannelOptions(JsonNetSerializer.Instance, delegate { }));
 

@@ -1,4 +1,5 @@
 using System;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -63,7 +64,8 @@ namespace Codestellation.SolarWind
 
         private async Task StartReadingTask()
         {
-            while (!_cancellationSource.IsCancellationRequested)
+            CancellationTokenSource cancellation = _cancellationSource;
+            while (!cancellation.IsCancellationRequested)
             {
                 await Receive().ConfigureAwait(false);
             }
@@ -123,7 +125,9 @@ namespace Codestellation.SolarWind
         private async Task StartWritingTask()
         {
             var batch = new Message[100];
-            while (!_cancellationSource.IsCancellationRequested)
+            CancellationTokenSource cancellationTokenSource = _cancellationSource;
+
+            while (!cancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
@@ -131,7 +135,7 @@ namespace Codestellation.SolarWind
 
                     if (batchLength == 0)
                     {
-                        await _session.AwaitOutgoing(_cancellationSource.Token).ConfigureAwait(false);
+                        await _session.AwaitOutgoing(cancellationTokenSource.Token).ConfigureAwait(false);
                         continue;
                     }
 
@@ -142,26 +146,31 @@ namespace Codestellation.SolarWind
                         {
                             //_logger.LogDebug($"Writing message {message.Header.ToString()}");
                             await _connection
-                                .WriteAsync(message, _cancellationSource.Token)
+                                .WriteAsync(message, cancellationTokenSource.Token)
                                 .ConfigureAwait(false);
                         }
                     }
 
-                    Array.Clear(batch, 0, batchLength); //Allow GC to collect streams
+                    Array.Clear(batch, 0, batch.Length); //Allow GC to collect streams
 
                     await _connection
-                        .FlushAsync(_cancellationSource.Token)
+                        .FlushAsync(cancellationTokenSource.Token)
                         .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
                     break;
                 }
+                catch (SocketException ex)
+                {
+                    if (ex.ErrorCode == (int)SocketError.ConnectionReset)
+                    {
+                        Stop();
+                        _connection.Reconnect();
+                    }
 
-                //catch (Exception ex)
-                //{
-                //    //Debugger.Break();
-                //}
+                    break;
+                }
             }
         }
 
