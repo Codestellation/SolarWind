@@ -142,13 +142,11 @@ namespace Codestellation.SolarWind
                     //TODO: Dispose messages in case of exception
                     for (var i = 0; i < batchLength; i++)
                     {
-                        using (Message message = batch[i])
-                        {
-                            //_logger.LogDebug($"Writing message {message.Header.ToString()}");
+                        //_logger.LogDebug($"Writing message {message.Header.ToString()}");
                             await _connection
-                                .WriteAsync(message, cancellationTokenSource.Token)
+                                .WriteAsync(batch[i], cancellationTokenSource.Token)
                                 .ConfigureAwait(false);
-                        }
+                        
                     }
 
                     Array.Clear(batch, 0, batch.Length); //Allow GC to collect streams

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,24 +42,12 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-
-        public async ValueTask WriteAsync(Message message, CancellationToken cancellation)
+        public ValueTask WriteAsync(in Message message, CancellationToken cancellation)
         {
-            _logger.LogDebug($"Writing header {message.Header.ToString()}");
+            _logger.LogDebug($"Writing message {message.Header.ToString()}");
             var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(WireHeader.Size);
-
-            WireHeader.WriteTo(wireHeader, buffer);
-            var memory = new Memory<byte>(buffer, 0, WireHeader.Size);
-            await _mainStream.WriteAsync(memory, cancellation).ConfigureAwait(false);
-            _logger.LogDebug($"Written header {message.Header.ToString()}");
-
-            ArrayPool<byte>.Shared.Return(buffer);
-            _logger.LogDebug($"Writing payload {message.Header.ToString()}");
-
-            await message.Payload.CopyIntoAsync(_mainStream, cancellation).ConfigureAwait(false);
-
-            _logger.LogDebug($"Written payload {message.Header.ToString()}");
+            WireHeader.WriteTo(wireHeader, _mainStream);
+            return message.Payload.CopyIntoAsync(_mainStream, cancellation);
         }
 
         public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
@@ -152,22 +139,6 @@ namespace Codestellation.SolarWind.Internals
             socket.SendTimeout = (int)options.SendTimeout.TotalMilliseconds;
             socket.LingerState = new LingerOption(true, 1);
         }
-
-        public void Write(in Message message)
-        {
-            //_logger.LogDebug($"Writing header {message.Header.ToString()}");
-            var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
-            WireHeader.WriteTo(wireHeader, _mainStream);
-            //_logger.LogDebug($"Written header {message.Header.ToString()}");
-
-            //_logger.LogDebug($"Writing payload {message.Header.ToString()}");
-
-            message.Payload.CopyInto(_mainStream);
-
-            //_logger.LogDebug($"Written payload {message.Header.ToString()}");
-        }
-
-        public void Flush() => _mainStream.Flush();
 
         public Task FlushAsync(CancellationToken cancellation) => _mainStream.FlushAsync(cancellation);
 
