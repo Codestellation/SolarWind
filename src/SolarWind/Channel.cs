@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +21,8 @@ namespace Codestellation.SolarWind
         private readonly Session _session;
         private SolarWindCallback _callback;
         private readonly ILogger<Channel> _logger;
+        private readonly Message[] _batch;
+        private int _batchLength;
 
         public HubId RemoteHubId { get; internal set; }
 
@@ -32,6 +35,7 @@ namespace Codestellation.SolarWind
                 throw new ArgumentNullException(nameof(factory));
             }
 
+            _batch = new Message[100];
             _logger = factory.CreateLogger<Channel>();
             _session = new Session(options.Serializer, OnIncomingMessage, factory.CreateLogger<Session>());
         }
@@ -95,8 +99,6 @@ namespace Codestellation.SolarWind
                         _logger.LogError(ex, "Receive error");
                     }
                 }
-                //if(ex is SocketException sex && sex.ErrorCode == SocketError.TimedOut)
-
 
                 buffer.Dispose();
                 return;
@@ -124,52 +126,53 @@ namespace Codestellation.SolarWind
 
         private async Task StartWritingTask()
         {
-            var batch = new Message[100];
             CancellationTokenSource cancellationTokenSource = _cancellationSource;
 
             while (!cancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    var batchLength = _session.TryDequeueBatch(batch);
-
-                    if (batchLength == 0)
+                    while (!cancellationTokenSource.IsCancellationRequested
+                           && _batchLength == 0 //Batch was not send due to exception. will try to resend it
+                           && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
                     {
                         await _session.AwaitOutgoing(cancellationTokenSource.Token).ConfigureAwait(false);
-                        continue;
                     }
 
-                    //TODO: Dispose messages in case of exception
-                    for (var i = 0; i < batchLength; i++)
-                    {
-                        //_logger.LogDebug($"Writing message {message.Header.ToString()}");
-                            await _connection
-                                .WriteAsync(batch[i], cancellationTokenSource.Token)
-                                .ConfigureAwait(false);
-                        
-                    }
 
-                    Array.Clear(batch, 0, batch.Length); //Allow GC to collect streams
+                    await TrySendBatch(cancellationTokenSource);
 
-                    await _connection
-                        .FlushAsync(cancellationTokenSource.Token)
-                        .ConfigureAwait(false);
+                    Array.ForEach(_batch, m => m.Dispose());
+                    Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
+                    _batchLength = 0;
+                }
+                //It's my buggy realization. I have to enclose socket exception into IOException as other streams do. 
+                catch (Exception ex) when (ex is SocketException || ex is IOException)
+                {
+                    Stop();
+                    _connection.Reconnect();
+                    break;
                 }
                 catch (OperationCanceledException)
                 {
                     break;
                 }
-                catch (SocketException ex)
-                {
-                    if (ex.ErrorCode == (int)SocketError.ConnectionReset)
-                    {
-                        Stop();
-                        _connection.Reconnect();
-                    }
-
-                    break;
-                }
             }
+        }
+
+        private async Task TrySendBatch(CancellationTokenSource cancellationTokenSource)
+        {
+            for (var i = 0; i < _batchLength; i++)
+            {
+                //_logger.LogDebug($"Writing message {message.Header.ToString()}");
+                await _connection
+                    .WriteAsync(_batch[i], cancellationTokenSource.Token)
+                    .ConfigureAwait(false);
+            }
+
+            await _connection
+                .FlushAsync(cancellationTokenSource.Token)
+                .ConfigureAwait(false);
         }
 
         //It's made internal to avoid occasional calls from user's code. 

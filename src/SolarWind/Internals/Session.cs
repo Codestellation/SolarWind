@@ -25,6 +25,8 @@ namespace Codestellation.SolarWind.Internals
 
         private readonly ILogger _logger;
 
+        private readonly PreemptiveHashSet<MessageId> _processedMessages;
+
         public Session(ISerializer serializer, DeserializationCallback callback, ILogger logger)
         {
             _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
@@ -34,6 +36,8 @@ namespace Codestellation.SolarWind.Internals
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
             _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ForceDefaultTaskScheduler);
             _outgoingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceDefaultTaskScheduler);
+
+            _processedMessages = new PreemptiveHashSet<MessageId>(256 * 1024);
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
             // message processing as well and thus stop reading all the sockets. 
@@ -50,7 +54,7 @@ namespace Codestellation.SolarWind.Internals
 
             while (!_disposal.IsCancellationRequested)
             {
-                int batchLength = _serializationQueue.TryDequeueBatch(batch);
+                var batchLength = _serializationQueue.TryDequeueBatch(batch);
 
                 if (batchLength == 0)
                 {
@@ -99,7 +103,7 @@ namespace Codestellation.SolarWind.Internals
 
             while (!_disposal.IsCancellationRequested)
             {
-                int batchLength = _incomingQueue.TryDequeueBatch(batch);
+                var batchLength = _incomingQueue.TryDequeueBatch(batch);
 
                 if (batchLength == 0)
                 {
@@ -143,7 +147,20 @@ namespace Codestellation.SolarWind.Internals
         }
 
 
-        public void EnqueueIncoming(in Message message) => _incomingQueue.Enqueue(message);
+        public void EnqueueIncoming(in Message message)
+        {
+            //Prevents double processing of the message
+            if (_processedMessages.Add(message.Header.MessageId))
+            {
+                _incomingQueue.Enqueue(message);
+            }
+            else
+            {
+                _logger.LogDebug($"Message {message.Header} already processed");
+                //Release buffers
+                message.Dispose();
+            }
+        }
 
         public MessageId EnqueueOutgoing(object data, MessageId replyTo)
         {
