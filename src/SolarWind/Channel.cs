@@ -41,7 +41,7 @@ namespace Codestellation.SolarWind
 
         internal void OnReconnect(Connection connection)
         {
-            Stop();
+            Stop(false);
             _cancellationSource = new CancellationTokenSource();
             _connection = connection;
 
@@ -89,17 +89,22 @@ namespace Codestellation.SolarWind
                 buffer.Position = 0;
                 message = new Message(wireHeader.MessageHeader, buffer);
             }
+            catch (IOException ex)
+            {
+                _logger.LogInformation(ex, "Receive Error.");
+                Stop(true);
+                buffer.Dispose();
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                buffer.Dispose();
+                return;
+            }
             catch (Exception ex)
             {
-                if (!(ex is OperationCanceledException))
-                {
-                    if (_logger.IsEnabled(LogLevel.Error))
-                    {
-                        _logger.LogError(ex, "Receive error");
-                    }
-                }
-
                 buffer.Dispose();
+                _logger.LogError(ex, "Receive error");
                 return;
             }
 
@@ -138,7 +143,7 @@ namespace Codestellation.SolarWind
                         await _session.AwaitOutgoing(cancellationTokenSource.Token).ConfigureAwait(false);
                     }
 
-                    await TrySendBatch(cancellationTokenSource);
+                    await TrySendBatch(cancellationTokenSource).ConfigureAwait(false);
 
                     Array.ForEach(_batch, m => m.Dispose());
                     Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
@@ -147,8 +152,9 @@ namespace Codestellation.SolarWind
                 //It's my buggy realization. I have to enclose socket exception into IOException as other streams do. 
                 catch (IOException ex)
                 {
-                    Stop();
-                    _connection.Reconnect();
+                    _logger.LogTrace(ex, "Send error");
+                    Stop(true);
+
                     break;
                 }
                 catch (OperationCanceledException)
@@ -176,19 +182,26 @@ namespace Codestellation.SolarWind
         //It's made internal to avoid occasional calls from user's code. 
         internal void Dispose()
         {
-            Stop();
+            Stop(false);
             _session.Dispose();
         }
 
-        private void Stop()
+        private void Stop(bool reconnect)
         {
-            if (_cancellationSource == null)
+            CancellationTokenSource source = Interlocked.Exchange(ref _cancellationSource, null);
+
+            if (source == null)
             {
                 return;
             }
 
-            _cancellationSource.Cancel();
+            source.Cancel();
             _connection.Dispose();
+
+            if (reconnect)
+            {
+                _connection.Reconnect();
+            }
         }
     }
 }

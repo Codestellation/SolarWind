@@ -54,7 +54,7 @@ namespace Codestellation.SolarWind.Internals
         public static async Task Accept(SolarWindHubOptions options, Socket socket, ILogger logger, Action<HubId, Connection> onAccepted)
         {
             HandshakeMessage incoming;
-            AsyncNetworkStream networkStream;
+            AsyncNetworkStream networkStream = null;
             try
             {
                 ConfigureSocket(socket, options);
@@ -67,6 +67,7 @@ namespace Codestellation.SolarWind.Internals
             catch (IOException ex)
             {
                 logger.LogWarning(ex, "Exception during connection acceptance");
+                networkStream?.Dispose();
                 return;
             }
 
@@ -78,6 +79,8 @@ namespace Codestellation.SolarWind.Internals
         {
             Socket socket = Build.TcpIPv4();
             ConfigureSocket(socket, options);
+
+            logger.LogInformation($"Starting connection to {remoteUri}");
 
             (HandshakeMessage handshake, AsyncNetworkStream stream) =
                 await DoConnect(options, remoteUri, logger, socket)
@@ -107,11 +110,11 @@ namespace Codestellation.SolarWind.Internals
 
                     return (handshakeResponse, networkStream);
                 }
-                catch (IOException ex)
+                catch (Exception ex)
                 {
                     if (logger.IsEnabled(LogLevel.Information))
                     {
-                        logger.LogInformation(ex, $"Cannot connect to '{remoteUri}");
+                        logger.LogInformation(ex, $"Cannot connect to '{remoteUri}.");
                     }
 
                     await Task.Delay(5000).ConfigureAwait(false);
