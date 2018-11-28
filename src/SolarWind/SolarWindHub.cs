@@ -78,7 +78,7 @@ namespace Codestellation.SolarWind
             }
 
             //Start connection attempts. 
-            Connection.ConnectTo(_hubOptions, remoteUri, _hubOptions.LoggerFactory.CreateLogger(nameof(Connection)), OnConnected);
+            Connection.ConnectTo(_hubOptions, remoteUri, OnConnected);
             return result;
         }
 

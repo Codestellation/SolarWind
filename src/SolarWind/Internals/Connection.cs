@@ -30,7 +30,7 @@ namespace Codestellation.SolarWind.Internals
 
         public async ValueTask ReceiveAsync(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            var left = bytesToReceive;
+            int left = bytesToReceive;
 
             while (left != 0)
             {
@@ -75,10 +75,11 @@ namespace Codestellation.SolarWind.Internals
             onAccepted(incoming.HubId, connection);
         }
 
-        public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, ILogger logger, Action<Uri, HubId, Connection> onConnected)
+        public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
         {
             Socket socket = Build.TcpIPv4();
             ConfigureSocket(socket, options);
+            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
 
             logger.LogInformation($"Starting connection to {remoteUri}");
 
@@ -86,7 +87,7 @@ namespace Codestellation.SolarWind.Internals
                 await DoConnect(options, remoteUri, logger, socket)
                     .ConfigureAwait(false);
 
-            Action reconnect = () => ConnectTo(options, remoteUri, logger, onConnected);
+            Action reconnect = () => ConnectTo(options, remoteUri, onConnected);
 
             var connection = new Connection(stream, logger, reconnect);
             onConnected(remoteUri, handshake.HubId, connection);
