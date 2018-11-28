@@ -60,7 +60,7 @@ namespace Codestellation.SolarWind.Tests
             }
 
             GCStats before = GCStats.Snapshot();
-            for (var times = 0; times < 120; times++)
+            for (var times = 0; times < 15; times++)
             {
                 if (_testCompleted.WaitOne(TimeSpan.FromSeconds(1)))
                 {

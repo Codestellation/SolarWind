@@ -71,19 +71,9 @@ namespace Codestellation.SolarWind.Internals
             }
             else
             {
-                try
-                {
-                    await Connection
-                        .Accept(_hubOptions, _args.AcceptSocket, onAccepted)
-                        .ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    if (_logger.IsEnabled(LogLevel.Error))
-                    {
-                        _logger.LogError(ex, "Error accepting connection");
-                    }
-                }
+                await Connection
+                    .Accept(_hubOptions, _args.AcceptSocket, _logger, onAccepted)
+                    .ConfigureAwait(false);
             }
 
             //Enter next accept cycle

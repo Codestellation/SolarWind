@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -89,13 +90,15 @@ namespace Codestellation.SolarWind.Internals
                     }
                     else
                     {
-                        throw new SocketException((int)_sendArgs.SocketError);
+                        SocketError socketError = _sendArgs.SocketError;
+                        ThrowException(socketError);
                     }
                 }
 
                 left = from.Length - sent;
             }
         }
+
 #endif
         private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
         {
@@ -106,7 +109,7 @@ namespace Codestellation.SolarWind.Internals
             }
             else
             {
-                _sendSource.SetException(new SocketException((int)e.SocketError));
+                _sendSource.SetException(BuildIoException(e.SocketError));
             }
         }
 
@@ -114,13 +117,21 @@ namespace Codestellation.SolarWind.Internals
         {
             if (e.SocketError == SocketError.Success)
             {
-                var result = _receiveSource.SetResult(e.BytesTransferred);
-                //Console.WriteLine($"Set result: {result}");
+                _receiveSource.SetResult(e.BytesTransferred);
             }
             else
             {
-                _receiveSource.SetException(new SocketException((int)e.SocketError));
+                _receiveSource.SetException(BuildIoException(e.SocketError));
             }
+        }
+
+        private static void ThrowException(SocketError socketError) => throw BuildIoException(socketError);
+
+        private static IOException BuildIoException(SocketError socketError)
+        {
+            var socketException = new SocketException((int)socketError);
+            var ioException = new IOException("Send or receive failed", socketException);
+            return ioException;
         }
     }
 }

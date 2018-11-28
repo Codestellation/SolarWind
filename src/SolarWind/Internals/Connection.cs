@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,30 +51,25 @@ namespace Codestellation.SolarWind.Internals
             return message.Payload.CopyIntoAsync(_mainStream, cancellation);
         }
 
-        public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
+        public static async Task Accept(SolarWindHubOptions options, Socket socket, ILogger logger, Action<HubId, Connection> onAccepted)
         {
-            ConfigureSocket(socket, options);
-            var networkStream = new AsyncNetworkStream(socket);
-            //SslStream sslStream = null;
+            HandshakeMessage incoming;
+            AsyncNetworkStream networkStream;
+            try
+            {
+                ConfigureSocket(socket, options);
+                networkStream = new AsyncNetworkStream(socket);
 
-            //if (certificate != null)
-            //{
-            //    sslStream = new SslStream(networkStream, false);
-            //    await sslStream
-            //        .AuthenticateAsServerAsync(certificate, false, SslProtocols.Tls12, true)
-            //        .ConfigureAwait(false);
+                incoming = await networkStream
+                    .HandshakeAsServer(options.HubId)
+                    .ConfigureAwait(false);
+            }
+            catch (IOException ex)
+            {
+                logger.LogWarning(ex, "Exception during connection acceptance");
+                return;
+            }
 
-            //    if (!sslStream.IsAuthenticated)
-            //    {
-            //        sslStream.Close();
-            //        return null;
-            //    }
-            //}
-
-
-            HandshakeMessage incoming = await networkStream
-                .HandshakeAsServer(options.HubId)
-                .ConfigureAwait(false);
             var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>(), null);
             onAccepted(incoming.HubId, connection);
         }
@@ -83,6 +79,18 @@ namespace Codestellation.SolarWind.Internals
             Socket socket = Build.TcpIPv4();
             ConfigureSocket(socket, options);
 
+            (HandshakeMessage handshake, AsyncNetworkStream stream) =
+                await DoConnect(options, remoteUri, logger, socket)
+                    .ConfigureAwait(false);
+
+            Action reconnect = () => ConnectTo(options, remoteUri, logger, onConnected);
+
+            var connection = new Connection(stream, logger, reconnect);
+            onConnected(remoteUri, handshake.HubId, connection);
+        }
+
+        private static async Task<(HandshakeMessage handshake, AsyncNetworkStream stream)> DoConnect(SolarWindHubOptions options, Uri remoteUri, ILogger logger, Socket socket)
+        {
             while (true)
             {
                 try
@@ -90,45 +98,25 @@ namespace Codestellation.SolarWind.Internals
                     await socket
                         .ConnectAsync(remoteUri.ResolveRemoteEndpoint())
                         .ConfigureAwait(false);
-                    break;
+
+                    var networkStream = new AsyncNetworkStream(socket);
+
+                    HandshakeMessage handshakeResponse = await networkStream
+                        .HandshakeAsClient(options.HubId)
+                        .ConfigureAwait(false);
+
+                    return (handshakeResponse, networkStream);
                 }
-                catch (SocketException e)
+                catch (IOException ex)
                 {
-                    if (logger.IsEnabled(LogLevel.Trace))
+                    if (logger.IsEnabled(LogLevel.Information))
                     {
-                        logger.LogTrace(e, $"Cannot connect to '{remoteUri}");
+                        logger.LogInformation(ex, $"Cannot connect to '{remoteUri}");
                     }
 
                     await Task.Delay(5000).ConfigureAwait(false);
                 }
             }
-
-
-            var networkStream = new AsyncNetworkStream(socket);
-            //SslStream sslStream = null;
-            //if (remoteUri.UseTls())
-            //{
-            //    sslStream = new SslStream(networkStream, false);
-            //    await sslStream
-            //        .AuthenticateAsClientAsync(remoteUri.Host)
-            //        .ConfigureAwait(false);
-
-            //    if (!sslStream.IsAuthenticated)
-            //    {
-            //        sslStream.Close();
-            //        return null;
-            //    }
-            //}
-
-            HandshakeMessage handshakeResponse = await networkStream
-                .HandshakeAsClient(options.HubId)
-                .ConfigureAwait(false);
-
-
-            Action reconnect = () => ConnectTo(options, remoteUri, logger, onConnected);
-
-            var connection = new Connection(networkStream, logger, reconnect);
-            onConnected(remoteUri, handshakeResponse.HubId, connection);
         }
 
 

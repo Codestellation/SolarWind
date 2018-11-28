@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -139,7 +138,6 @@ namespace Codestellation.SolarWind
                         await _session.AwaitOutgoing(cancellationTokenSource.Token).ConfigureAwait(false);
                     }
 
-
                     await TrySendBatch(cancellationTokenSource);
 
                     Array.ForEach(_batch, m => m.Dispose());
@@ -147,7 +145,7 @@ namespace Codestellation.SolarWind
                     _batchLength = 0;
                 }
                 //It's my buggy realization. I have to enclose socket exception into IOException as other streams do. 
-                catch (Exception ex) when (ex is SocketException || ex is IOException)
+                catch (IOException ex)
                 {
                     Stop();
                     _connection.Reconnect();
