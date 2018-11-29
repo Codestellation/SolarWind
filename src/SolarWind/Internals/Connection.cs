@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -77,20 +78,18 @@ namespace Codestellation.SolarWind.Internals
 
         public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
         {
-            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
-
-            logger.LogInformation($"Starting connection to {remoteUri}");
-
             (HandshakeMessage handshake, AsyncNetworkStream stream) = await DoConnect(options, remoteUri).ConfigureAwait(false);
 
             Action reconnect = () => ConnectTo(options, remoteUri, onConnected);
-
+            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
             var connection = new Connection(stream, logger, reconnect);
             onConnected(remoteUri, handshake.HubId, connection);
         }
 
         private static async Task<(HandshakeMessage handshake, AsyncNetworkStream stream)> DoConnect(SolarWindHubOptions options, Uri remoteUri)
         {
+            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+
             while (true)
             {
                 Socket socket = null;
@@ -99,8 +98,12 @@ namespace Codestellation.SolarWind.Internals
                     socket = Build.TcpIPv4();
                     ConfigureSocket(socket, options);
 
+                    IPEndPoint remoteEp = remoteUri.ResolveRemoteEndpoint();
+
+                    logger.LogInformation($"Connecting to '{remoteUri}' ({remoteEp})");
+
                     await socket
-                        .ConnectAsync(remoteUri.ResolveRemoteEndpoint())
+                        .ConnectAsync(remoteEp)
                         .ConfigureAwait(false);
 
                     var networkStream = new AsyncNetworkStream(socket);
@@ -113,11 +116,9 @@ namespace Codestellation.SolarWind.Internals
                 }
                 catch (Exception ex)
                 {
-                    ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
-
                     if (logger.IsEnabled(LogLevel.Information))
                     {
-                        logger.LogInformation(ex, $"Cannot connect to '{remoteUri}.");
+                        logger.LogInformation($"Cannot connect to '{remoteUri}. Reason: {ex.Message}");
                     }
 
                     socket.SafeDispose();

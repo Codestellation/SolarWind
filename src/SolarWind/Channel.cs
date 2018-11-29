@@ -88,6 +88,11 @@ namespace Codestellation.SolarWind
                 await Receive(buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
                 buffer.Position = 0;
                 message = new Message(wireHeader.MessageHeader, buffer);
+
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug($"Received {message.Header.ToString()}");
+                }
             }
             catch (IOException ex)
             {
