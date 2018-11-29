@@ -41,7 +41,9 @@ namespace Codestellation.SolarWind
 
         internal void OnReconnect(Connection connection)
         {
+            _logger.LogInformation($"Reconnected to {RemoteHubId}");
             Stop(false);
+
             _cancellationSource = new CancellationTokenSource();
             _connection = connection;
 
@@ -67,6 +69,7 @@ namespace Codestellation.SolarWind
 
         private async Task StartReadingTask()
         {
+            _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
             CancellationTokenSource cancellation = _cancellationSource;
             while (!cancellation.IsCancellationRequested)
             {
@@ -135,6 +138,8 @@ namespace Codestellation.SolarWind
 
         private async Task StartWritingTask()
         {
+            _logger.LogInformation($"Starting writing to {RemoteHubId.Id}");
+
             CancellationTokenSource cancellationTokenSource = _cancellationSource;
 
             while (!cancellationTokenSource.IsCancellationRequested)

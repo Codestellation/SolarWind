@@ -82,6 +82,8 @@ namespace Codestellation.SolarWind.Internals
 
             Action reconnect = () => ConnectTo(options, remoteUri, onConnected);
             ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+
+
             var connection = new Connection(stream, logger, reconnect);
             onConnected(remoteUri, handshake.HubId, connection);
         }
@@ -111,6 +113,8 @@ namespace Codestellation.SolarWind.Internals
                     HandshakeMessage handshakeResponse = await networkStream
                         .HandshakeAsClient(options.HubId)
                         .ConfigureAwait(false);
+
+                    logger.LogInformation($"Successfully connected to '{handshakeResponse.HubId}' ({remoteUri})");
 
                     return (handshakeResponse, networkStream);
                 }
