@@ -295,7 +295,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 int bytesToCopy = Math.Min(left, buffer.Length);
                 var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesToCopy);
-                await destination.WriteAsync(memory, cancellation);
+                await destination.WriteAsync(memory, cancellation).ConfigureAwait(false);
                 left -= bytesToCopy;
                 if (left == 0)
                 {
@@ -311,7 +311,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 int bytesToCopy = Math.Min(left, buffer.Length);
                 var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesToCopy);
-                await destination.WriteAsync(memory, cancellation);
+                await destination.WriteAsync(memory, cancellation).ConfigureAwait(false);
                 left -= bytesToCopy;
                 if (left == 0)
                 {
