@@ -141,6 +141,7 @@ namespace Codestellation.SolarWind
             {
                 try
                 {
+                    _logger.LogDebug($"Dequeuing batch to send to {RemoteHubId.ToString()}");
                     while (!cancellationTokenSource.IsCancellationRequested
                            && _batchLength == 0 //Batch was not send due to exception. will try to resend it
                            && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
@@ -148,6 +149,7 @@ namespace Codestellation.SolarWind
                         await _session.AwaitOutgoing(cancellationTokenSource.Token).ConfigureAwait(false);
                     }
 
+                    _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
                     await TrySendBatch(cancellationTokenSource).ConfigureAwait(false);
 
                     Array.ForEach(_batch, m => m.Dispose());
@@ -157,13 +159,14 @@ namespace Codestellation.SolarWind
                 //It's my buggy realization. I have to enclose socket exception into IOException as other streams do. 
                 catch (IOException ex)
                 {
-                    _logger.LogTrace(ex, "Send error");
+                    _logger.LogDebug(ex, "Send error");
                     Stop(true);
 
                     break;
                 }
                 catch (OperationCanceledException)
                 {
+                    _logger.LogInformation("Send worker stopped");
                     break;
                 }
             }
