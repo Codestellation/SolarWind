@@ -30,7 +30,7 @@ namespace Codestellation.SolarWind.Internals
 
         public async ValueTask ReceiveAsync(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            int left = bytesToReceive;
+            var left = bytesToReceive;
 
             while (left != 0)
             {
@@ -77,15 +77,11 @@ namespace Codestellation.SolarWind.Internals
 
         public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
         {
-            Socket socket = Build.TcpIPv4();
-            ConfigureSocket(socket, options);
             ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
 
             logger.LogInformation($"Starting connection to {remoteUri}");
 
-            (HandshakeMessage handshake, AsyncNetworkStream stream) =
-                await DoConnect(options, remoteUri, logger, socket)
-                    .ConfigureAwait(false);
+            (HandshakeMessage handshake, AsyncNetworkStream stream) = await DoConnect(options, remoteUri).ConfigureAwait(false);
 
             Action reconnect = () => ConnectTo(options, remoteUri, onConnected);
 
@@ -93,12 +89,16 @@ namespace Codestellation.SolarWind.Internals
             onConnected(remoteUri, handshake.HubId, connection);
         }
 
-        private static async Task<(HandshakeMessage handshake, AsyncNetworkStream stream)> DoConnect(SolarWindHubOptions options, Uri remoteUri, ILogger logger, Socket socket)
+        private static async Task<(HandshakeMessage handshake, AsyncNetworkStream stream)> DoConnect(SolarWindHubOptions options, Uri remoteUri)
         {
             while (true)
             {
+                Socket socket = null;
                 try
                 {
+                    socket = Build.TcpIPv4();
+                    ConfigureSocket(socket, options);
+
                     await socket
                         .ConnectAsync(remoteUri.ResolveRemoteEndpoint())
                         .ConfigureAwait(false);
@@ -113,16 +113,18 @@ namespace Codestellation.SolarWind.Internals
                 }
                 catch (Exception ex)
                 {
+                    ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+
                     if (logger.IsEnabled(LogLevel.Information))
                     {
                         logger.LogInformation(ex, $"Cannot connect to '{remoteUri}.");
                     }
 
+                    socket.SafeDispose();
                     await Task.Delay(5000).ConfigureAwait(false);
                 }
             }
         }
-
 
         private static void ConfigureSocket(Socket socket, SolarWindHubOptions options)
         {
