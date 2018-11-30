@@ -27,7 +27,7 @@ namespace Codestellation.SolarWind.Internals
             //TODO: Use buffer pool one day
             var buffer = new byte[1024];
             //TODO: Check where we have written all the text
-            int payloadSize = Encoding.UTF8.GetBytes(hubId.Id, 0, hubId.Id.Length, buffer, WireHeader.Size);
+            var payloadSize = Encoding.UTF8.GetBytes(hubId.Id, 0, hubId.Id.Length, buffer, WireHeader.Size);
             var msgHeader = new MessageHeader(MessageTypeId.Handshake, MessageId.Empty, MessageId.Empty);
             var outgoingHeader = new WireHeader(msgHeader, new PayloadSize(payloadSize));
             WireHeader.WriteTo(in outgoingHeader, buffer);
@@ -38,6 +38,26 @@ namespace Codestellation.SolarWind.Internals
         public static async ValueTask<HandshakeMessage> ReceiveHandshake(this AsyncNetworkStream self)
         {
             var buffer = new PooledMemoryStream();
+            var successful = new SemaphoreSlim(0);
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    if (!await successful.WaitAsync(1000).ConfigureAwait(false))
+                    {
+                        self.Dispose();
+                    }
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    successful.Dispose();
+                }
+            });
+
             try
             {
                 if (!await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(false))
@@ -60,7 +80,7 @@ namespace Codestellation.SolarWind.Internals
                     return null;
                 }
 
-                buffer.Position = 0;
+                successful.Release();
                 return HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
             }
             finally
@@ -71,7 +91,7 @@ namespace Codestellation.SolarWind.Internals
 
         private static async ValueTask<bool> ReceiveBytesAsync(this AsyncNetworkStream self, PooledMemoryStream readBuffer, int bytesToReceive)
         {
-            int left = bytesToReceive;
+            var left = bytesToReceive;
             do
             {
                 left -= await readBuffer

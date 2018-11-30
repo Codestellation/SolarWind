@@ -28,6 +28,9 @@ namespace Codestellation.SolarWind.Internals
             _sendArgs = new SocketAsyncEventArgs();
             _sendArgs.Completed += OnSendCompleted;
             _sendSource = new AutoResetValueTaskSource<int>();
+
+            ReadTimeout = 1000;
+            WriteTimeout = 1000;
         }
 
 #if NETSTANDARD2_0
@@ -66,11 +69,11 @@ namespace Codestellation.SolarWind.Internals
                 throw new InvalidOperationException("Non array base memory is supported for .net core 2.1+ only");
             }
 
-            int left = from.Length;
+            var left = from.Length;
             var sent = 0;
             while (left != 0)
             {
-                int realOffset = segment.Offset + sent;
+                var realOffset = segment.Offset + sent;
 
                 _sendArgs.SetBuffer(segment.Array, realOffset, left);
 

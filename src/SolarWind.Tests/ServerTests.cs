@@ -100,10 +100,22 @@ namespace Codestellation.SolarWind.Tests
             }
         }
 
+        [Test]
+        public void Should_drop_invalid_connections()
+        {
+            using (var client = new TcpClient())
+            {
+                client.Connect(_uri.Host, _uri.Port);
+
+                client.ReceiveTimeout = 10_000;
+                client.GetStream().Read(new byte[100], 0, 100);
+            }
+        }
+
         private static void AssertReceived(TcpClient client)
         {
             var expectedBytes = 87;
-            int left = expectedBytes;
+            var left = expectedBytes;
             var buffer = new byte[512];
             var received = 0;
             do
