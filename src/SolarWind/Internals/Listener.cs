@@ -73,7 +73,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 _logger.LogInformation($"Accepted socket from {e.AcceptSocket.RemoteEndPoint}");
                 await Connection
-                    .Accept(_hubOptions, _args.AcceptSocket, _logger, onAccepted)
+                    .Accept(_hubOptions, _args.AcceptSocket, onAccepted)
                     .ConfigureAwait(false);
             }
 

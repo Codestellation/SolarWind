@@ -17,6 +17,8 @@ namespace Codestellation.SolarWind.Internals
         private readonly SocketAsyncEventArgs _sendArgs;
         private readonly AutoResetValueTaskSource<int> _sendSource;
 
+        public Socket UnderlyingSocket => Socket;
+
         public AsyncNetworkStream(Socket socket) : base(socket, true)
         {
             _receiveArgs = new SocketAsyncEventArgs();
@@ -64,14 +66,13 @@ namespace Codestellation.SolarWind.Internals
                 throw new InvalidOperationException("Non array base memory is supported for .net core 2.1+ only");
             }
 
-            var left = from.Length;
+            int left = from.Length;
             var sent = 0;
             while (left != 0)
             {
-                var realOffset = segment.Offset + sent;
+                int realOffset = segment.Offset + sent;
 
                 _sendArgs.SetBuffer(segment.Array, realOffset, left);
-
 
                 if (Socket.SendAsync(_sendArgs))
                 {

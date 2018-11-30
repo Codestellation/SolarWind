@@ -31,7 +31,7 @@ namespace Codestellation.SolarWind.Internals
 
         public async ValueTask ReceiveAsync(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            var left = bytesToReceive;
+            int left = bytesToReceive;
 
             while (left != 0)
             {
@@ -52,8 +52,10 @@ namespace Codestellation.SolarWind.Internals
             return message.Payload.CopyIntoAsync(_mainStream, cancellation);
         }
 
-        public static async Task Accept(SolarWindHubOptions options, Socket socket, ILogger logger, Action<HubId, Connection> onAccepted)
+        public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
         {
+            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+
             HandshakeMessage incoming;
             AsyncNetworkStream networkStream = null;
             try
@@ -61,9 +63,13 @@ namespace Codestellation.SolarWind.Internals
                 ConfigureSocket(socket, options);
                 networkStream = new AsyncNetworkStream(socket);
 
+                logger.LogInformation("Begin handshake as server");
+
                 incoming = await networkStream
-                    .HandshakeAsServer(options.HubId)
+                    .HandshakeAsServer(options.HubId, logger)
                     .ConfigureAwait(false);
+
+                logger.LogInformation("End handshake as server");
             }
             catch (IOException ex)
             {
@@ -108,10 +114,12 @@ namespace Codestellation.SolarWind.Internals
                         .ConnectAsync(remoteEp)
                         .ConfigureAwait(false);
 
+                    logger.LogInformation($"Connected to '{remoteUri}' ({remoteEp})");
+
                     var networkStream = new AsyncNetworkStream(socket);
 
                     HandshakeMessage handshakeResponse = await networkStream
-                        .HandshakeAsClient(options.HubId)
+                        .HandshakeAsClient(options.HubId, logger)
                         .ConfigureAwait(false);
 
                     logger.LogInformation($"Successfully connected to '{handshakeResponse.HubId}' ({remoteUri})");
