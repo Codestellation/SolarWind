@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -31,7 +30,7 @@ namespace Codestellation.SolarWind.Internals
 
         public async ValueTask ReceiveAsync(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            int left = bytesToReceive;
+            var left = bytesToReceive;
 
             while (left != 0)
             {
@@ -71,9 +70,9 @@ namespace Codestellation.SolarWind.Internals
 
                 logger.LogInformation("End handshake as server");
             }
-            catch (IOException ex)
+            catch (Exception ex)
             {
-                logger.LogWarning(ex, "Exception during connection acceptance");
+                logger.LogWarning(ex, "Exception during handshake");
                 networkStream?.Dispose();
                 return;
             }

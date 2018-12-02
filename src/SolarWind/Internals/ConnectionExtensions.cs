@@ -4,20 +4,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
 {
-    public static class ConnectionExtensions
+    internal static class ConnectionExtensions
     {
-        internal static async Task<HandshakeMessage> HandshakeAsServer(this AsyncNetworkStream stream, HubId hubId, ILogger logger)
+        public static async Task<HandshakeMessage> HandshakeAsServer(this AsyncNetworkStream stream, HubId hubId, ILogger logger)
         {
             logger.LogInformation("Waiting for handshake message from a client");
             HandshakeMessage incoming = await stream
                 .ReceiveHandshake()
                 .ConfigureAwait(false);
-
-            if (incoming == null)
-            {
-                logger.LogInformation("Received empty handshake");
-                return null;
-            }
 
             logger.LogInformation($"Received handshake from {incoming.HubId.Id}");
 
@@ -46,5 +40,7 @@ namespace Codestellation.SolarWind.Internals
 
             return handshakeResponse;
         }
+
+        
     }
 }
