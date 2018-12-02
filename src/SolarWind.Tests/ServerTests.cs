@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
 using FluentAssertions;
@@ -110,6 +111,29 @@ namespace Codestellation.SolarWind.Tests
                 client.ReceiveTimeout = 10_000;
                 client.GetStream().Read(new byte[100], 0, 100);
             }
+        }
+
+        [Test]
+        public void Should_accept_connections_concurrently()
+        {
+            var connected = new ManualResetEvent(false);
+            Task.Run(() =>
+            {
+                using (var invalidClient = new TcpClient())
+                {
+                    invalidClient.Connect(_uri.Host, _uri.Port);
+                    connected.Set();
+                    invalidClient.ReceiveTimeout = 10_000;
+                    invalidClient.GetStream().Read(new byte[100], 0, 100);
+                }
+            });
+            connected.WaitOne(TimeSpan.FromMilliseconds(500)).Should().BeTrue();
+            Assert.DoesNotThrow(() =>
+            {
+                using (CreateClient())
+                {
+                }
+            });
         }
 
         private static void AssertReceived(TcpClient client)

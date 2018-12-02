@@ -62,23 +62,28 @@ namespace Codestellation.SolarWind.Internals
 
         private async void OnSocketAccepted(SocketAsyncEventArgs e, Action<HubId, Connection> onAccepted)
         {
-            if (e.SocketError != SocketError.Success)
+            SocketError eSocketError = e.SocketError;
+            Socket argsAcceptSocket = _args.AcceptSocket;
+
+            //Enter next accept cycle
+            Listen(onAccepted);
+
+            if (eSocketError != SocketError.Success)
             {
                 if (_logger.IsEnabled(LogLevel.Error))
                 {
-                    _logger.LogError($"Error accepting socket. Exception code = {(int)e.SocketError} ({e.SocketError})");
+                    _logger.LogError($"Error accepting socket. Exception code = {(int)eSocketError} ({eSocketError})");
                 }
+
+                argsAcceptSocket.SafeDispose();
             }
             else
             {
                 _logger.LogInformation($"Accepted socket from {e.AcceptSocket.RemoteEndPoint}");
                 await Connection
-                    .Accept(_hubOptions, _args.AcceptSocket, onAccepted)
+                    .Accept(_hubOptions, argsAcceptSocket, onAccepted)
                     .ConfigureAwait(false);
             }
-
-            //Enter next accept cycle
-            Listen(onAccepted);
         }
 
 
