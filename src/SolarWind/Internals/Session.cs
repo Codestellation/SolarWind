@@ -44,6 +44,8 @@ namespace Codestellation.SolarWind.Internals
             _incomingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceDefaultTaskScheduler);
             _disposal = new CancellationTokenSource();
 
+            _currentMessageId = MessageId.Initialize();
+
             Task.Run(StartSerializationTask);
             Task.Run(StartDeserializationTask);
         }
