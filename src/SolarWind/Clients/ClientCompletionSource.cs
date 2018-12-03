@@ -30,5 +30,6 @@ namespace Codestellation.SolarWind.Clients
         }
 
         public void SetGenericResult(object data) => SetResult((TResponse)data);
+        public bool TrySetTimeout(TimeSpan timeout) => SetException(new TimeoutException());
     }
 }

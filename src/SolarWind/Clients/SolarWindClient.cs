@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
 using Codestellation.SolarWind.Threading;
@@ -9,13 +10,30 @@ namespace Codestellation.SolarWind.Clients
     public class SolarWindClient
     {
         private readonly Channel _channel;
+        private readonly SolarWindClientOptions _options;
         private readonly ConcurrentDictionary<MessageId, object> _requestRegistry;
+        private Task _timeoutTask;
 
-        public SolarWindClient(Channel channel)
+        public SolarWindClient(Channel channel, SolarWindClientOptions options)
         {
             _channel = channel ?? throw new ArgumentNullException(nameof(channel));
+            _options = options ?? throw new ArgumentNullException(nameof(options));
             channel.SetCallback(OnSolarWindCallback);
             _requestRegistry = new ConcurrentDictionary<MessageId, object>();
+
+            _timeoutTask = Task.Run(CheckTimeouts);
+        }
+
+        private async void CheckTimeouts()
+        {
+            await Task.Delay(1000).ConfigureAwait(false);
+            foreach (KeyValuePair<MessageId, object> record in _requestRegistry)
+            {
+                if (record.Value is IClientCompletionSource source && source.TrySetTimeout(_options.RequestTimeout))
+                {
+                    _requestRegistry.TryRemove(record.Key, out _);
+                }
+            }
         }
 
         /// <summary>

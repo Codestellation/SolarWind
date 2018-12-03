@@ -89,7 +89,7 @@ namespace Codestellation.SolarWind.Threading
             //return false;
         }
 
-        public void SetException(Exception error)
+        public bool SetException(Exception error)
         {
             //If monitor is entered by someone else - we are late, so simply drop results
             if (Monitor.TryEnter(_cancellationCallback))
@@ -97,12 +97,16 @@ namespace Codestellation.SolarWind.Threading
                 if (_logic.Completed)
                 {
                     Monitor.Exit(_cancellationCallback);
-                    return;
+                    return false;
                 }
 
                 _logic.SetException(error);
+
                 Monitor.Exit(_cancellationCallback);
+                return true;
             }
+
+            return false;
         }
 
         public void SetCanceled() => SetException(new TaskCanceledException());
@@ -147,7 +151,6 @@ namespace Codestellation.SolarWind.Threading
         private object _continuationState;
         private object _capturedContext;
         private ExecutionContext _executionContext;
-        private bool _completed;
         private TResult _result;
         private ExceptionDispatchInfo _error;
         private CancellationTokenRegistration? _registration;
@@ -160,7 +163,7 @@ namespace Codestellation.SolarWind.Threading
             _continuationState = null;
             _capturedContext = null;
             _executionContext = null;
-            _completed = false;
+            Completed = false;
             _result = default;
             _error = null;
             Version = 0;
@@ -169,7 +172,7 @@ namespace Codestellation.SolarWind.Threading
 
         public short Version { get; private set; }
 
-        public bool Completed => _completed;
+        public bool Completed { get; private set; }
 
         private void ValidateToken(short token)
         {
@@ -184,7 +187,7 @@ namespace Codestellation.SolarWind.Threading
             ValidateToken(token);
 
             return
-                !_completed ? ValueTaskSourceStatus.Pending :
+                !Completed ? ValueTaskSourceStatus.Pending :
                 _error == null ? ValueTaskSourceStatus.Succeeded :
                 _error.SourceException is OperationCanceledException ? ValueTaskSourceStatus.Canceled :
                 ValueTaskSourceStatus.Faulted;
@@ -194,7 +197,7 @@ namespace Codestellation.SolarWind.Threading
         {
             ValidateToken(token);
 
-            if (!_completed)
+            if (!Completed)
             {
                 throw new InvalidOperationException();
             }
@@ -213,7 +216,7 @@ namespace Codestellation.SolarWind.Threading
 
             _registration?.Dispose();
 
-            _completed = false;
+            Completed = false;
             _continuation = null;
             _continuationState = null;
             _result = default;
@@ -298,12 +301,12 @@ namespace Codestellation.SolarWind.Threading
 
         private void SignalCompletion()
         {
-            if (_completed)
+            if (Completed)
             {
                 throw new InvalidOperationException("Double completion of completion source is prohibited");
             }
 
-            _completed = true;
+            Completed = true;
 
             if (Interlocked.CompareExchange(ref _continuation, s_sentinel, null) != null)
             {
