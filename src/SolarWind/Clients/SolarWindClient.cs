@@ -7,12 +7,13 @@ using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind.Clients
 {
-    public class SolarWindClient
+    public class SolarWindClient : IDisposable
     {
         private readonly Channel _channel;
         private readonly SolarWindClientOptions _options;
         private readonly ConcurrentDictionary<MessageId, object> _requestRegistry;
         private Task _timeoutTask;
+        private bool _disposed;
 
         public SolarWindClient(Channel channel, SolarWindClientOptions options)
         {
@@ -26,12 +27,15 @@ namespace Codestellation.SolarWind.Clients
 
         private async void CheckTimeouts()
         {
-            await Task.Delay(1000).ConfigureAwait(false);
-            foreach (KeyValuePair<MessageId, object> record in _requestRegistry)
+            while (!_disposed)
             {
-                if (record.Value is IClientCompletionSource source && source.TrySetTimeout(_options.RequestTimeout))
+                await Task.Delay(1000).ConfigureAwait(false);
+                foreach (KeyValuePair<MessageId, object> record in _requestRegistry)
                 {
-                    _requestRegistry.TryRemove(record.Key, out _);
+                    if (record.Value is IClientCompletionSource source && source.TrySetTimeout(_options.RequestTimeout))
+                    {
+                        _requestRegistry.TryRemove(record.Key, out _);
+                    }
                 }
             }
         }
@@ -74,5 +78,7 @@ namespace Codestellation.SolarWind.Clients
                 source.SetGenericResult(data);
             }
         }
+
+        public void Dispose() => _disposed = true;
     }
 }
