@@ -104,37 +104,37 @@ namespace Codestellation.SolarWind.Internals
         }
 
 #endif
-        private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
-        {
-            if (e.SocketError == SocketError.Success)
-            {
-                //Console.WriteLine($"{Thread.CurrentThread.ManagedThreadId}: Async callback success");
-                _sendSource.SetResult(e.BytesTransferred);
-            }
-            else
-            {
-                _sendSource.SetException(BuildIoException(e.SocketError));
-            }
-        }
+        private void OnSendCompleted(object sender, SocketAsyncEventArgs e) => HandleAsyncResult(e, _sendSource);
 
-        private void OnReceiveCompleted(object sender, SocketAsyncEventArgs e)
+        private void OnReceiveCompleted(object sender, SocketAsyncEventArgs e) => HandleAsyncResult(e, _receiveSource);
+
+        private static void HandleAsyncResult(SocketAsyncEventArgs e, AutoResetValueTaskSource<int> valueTaskSource)
         {
-            if (e.SocketError == SocketError.Success)
+            if (e.SocketError != SocketError.Success)
             {
-                _receiveSource.SetResult(e.BytesTransferred);
+                valueTaskSource.SetException(BuildIoException(e.SocketError));
+            }
+            else if (e.BytesTransferred == 0)
+            {
+                // Zero transferred bytes means connection has been closed at the counterpart side.
+                // See https://docs.microsoft.com/en-us/dotnet/api/system.net.sockets.socketasynceventargs.bytestransferred?view=netframework-4.7.2
+                valueTaskSource.SetException(BuildConnectionClosedException());
             }
             else
             {
-                _receiveSource.SetException(BuildIoException(e.SocketError));
+                valueTaskSource.SetResult(e.BytesTransferred);
             }
         }
 
         private static void ThrowException(SocketError socketError) => throw BuildIoException(socketError);
 
-        private static IOException BuildIoException(SocketError socketError)
+
+        private static IOException BuildConnectionClosedException() => BuildIoException(SocketError.SocketError, "The counterpart has closed the connection");
+
+        private static IOException BuildIoException(SocketError socketError, string message = "Send or receive failed")
         {
             var socketException = new SocketException((int)socketError);
-            var ioException = new IOException("Send or receive failed", socketException);
+            var ioException = new IOException(message, socketException);
             return ioException;
         }
     }
