@@ -37,38 +37,43 @@ namespace Codestellation.SolarWind.Internals
 
         public static async ValueTask<HandshakeMessage> ReceiveHandshake(this AsyncNetworkStream self)
         {
-            async Task<HandshakeMessage> HandshakeMessage()
-            {
-                using (var buffer = new PooledMemoryStream())
-                {
-                    await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(false);
-
-
-                    buffer.Position = 0;
-                    WireHeader wireHeader = WireHeader.ReadFrom(buffer);
-
-                    buffer.Reset();
-
-                    if (!wireHeader.IsHandshake)
-                    {
-                        throw new SolarWindException("Invalid wire header");
-                    }
-
-                    await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
-                    buffer.Position = 0;
-                    return Protocol.HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
-                }
-            }
-
-            Task<HandshakeMessage> handshake = HandshakeMessage();
+            Task<HandshakeMessage> handshake = HandshakeMessage(self);
             Task timeout = Task.Delay(2000);
             await Task.WhenAny(handshake, timeout).ConfigureAwait(false);
+
             if (handshake.IsCompleted)
             {
                 return handshake.Result;
             }
 
-            throw new SolarWindException("Timeout");
+            //Cause socket to be close and thus throw IOException from handshake task.
+            self.Dispose();
+            //return the IOException from the handshake to make it observable by caller
+            return await handshake.ConfigureAwait(false);
+        }
+
+
+        private static async Task<HandshakeMessage> HandshakeMessage(this AsyncNetworkStream self)
+        {
+            using (var buffer = new PooledMemoryStream())
+            {
+                await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(false);
+
+
+                buffer.Position = 0;
+                WireHeader wireHeader = WireHeader.ReadFrom(buffer);
+
+                buffer.Reset();
+
+                if (!wireHeader.IsHandshake)
+                {
+                    throw new SolarWindException("Invalid wire header");
+                }
+
+                await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
+                buffer.Position = 0;
+                return Protocol.HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
+            }
         }
 
 
