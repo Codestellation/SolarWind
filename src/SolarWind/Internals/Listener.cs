@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
@@ -12,9 +13,12 @@ namespace Codestellation.SolarWind.Internals
         private bool _disposed;
         private readonly SocketAsyncEventArgs _args;
         private readonly ILogger<Listener> _logger;
+        private readonly ManualResetEventSlim _disposedWaitHandle;
 
         public Listener(SolarWindHubOptions hubOptions)
         {
+            _disposedWaitHandle = new ManualResetEventSlim(false);
+
             _hubOptions = hubOptions;
             _listener = Build.TcpIPv4();
             _args = new SocketAsyncEventArgs();
@@ -28,6 +32,7 @@ namespace Codestellation.SolarWind.Internals
             _listener.Bind(endpoint);
             _listener.Listen(10);
             _args.Completed += (sender, e) => OnSocketAccepted(e, onAccepted);
+
             Listen(onAccepted);
         }
 
@@ -35,6 +40,7 @@ namespace Codestellation.SolarWind.Internals
         {
             if (_disposed)
             {
+                _disposedWaitHandle.Set();
                 return;
             }
 
@@ -92,6 +98,8 @@ namespace Codestellation.SolarWind.Internals
             _disposed = true;
             _listener.Close();
             _listener.Dispose();
+
+            _disposedWaitHandle.Wait(TimeSpan.FromSeconds(1));
         }
     }
 }
