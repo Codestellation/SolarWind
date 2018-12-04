@@ -55,7 +55,6 @@ namespace Codestellation.SolarWind.Internals
         {
             ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
 
-            HandshakeMessage incoming;
             AsyncNetworkStream networkStream = null;
             try
             {
@@ -64,21 +63,20 @@ namespace Codestellation.SolarWind.Internals
 
                 logger.LogInformation("Begin handshake as server");
 
-                incoming = await networkStream
+                HandshakeMessage incoming = await networkStream
                     .HandshakeAsServer(options.HubId, logger)
                     .ConfigureAwait(false);
 
                 logger.LogInformation("End handshake as server");
+
+                var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>(), null);
+                onAccepted(incoming.HubId, connection);
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Exception during handshake");
                 networkStream?.Dispose();
-                return;
             }
-
-            var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>(), null);
-            onAccepted(incoming.HubId, connection);
         }
 
         public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
@@ -99,43 +97,61 @@ namespace Codestellation.SolarWind.Internals
 
             while (true)
             {
-                Socket socket = null;
-                try
+                IPEndPoint[] remoteEp = remoteUri.ResolveRemoteEndpoint();
+                foreach (IPEndPoint ipEndPoint in remoteEp)
                 {
-                    socket = Build.TcpIPv4();
-                    ConfigureSocket(socket, options);
+                    (HandshakeMessage handshake, AsyncNetworkStream stream) =
+                        await TryConnectoTo(remoteUri, ipEndPoint, logger, options)
+                            .ConfigureAwait(false);
 
-                    IPEndPoint remoteEp = remoteUri.ResolveRemoteEndpoint();
-
-                    logger.LogInformation($"Connecting to '{remoteUri}' ({remoteEp})");
-
-                    await socket
-                        .ConnectAsync(remoteEp)
-                        .ConfigureAwait(false);
-
-                    logger.LogInformation($"Connected to '{remoteUri}' ({remoteEp})");
-
-                    var networkStream = new AsyncNetworkStream(socket);
-
-                    HandshakeMessage handshakeResponse = await networkStream
-                        .HandshakeAsClient(options.HubId, logger)
-                        .ConfigureAwait(false);
-
-                    logger.LogInformation($"Successfully connected to '{handshakeResponse.HubId}' ({remoteUri})");
-
-                    return (handshakeResponse, networkStream);
-                }
-                catch (Exception ex)
-                {
-                    if (logger.IsEnabled(LogLevel.Information))
+                    if (handshake != null)
                     {
-                        logger.LogInformation($"Cannot connect to '{remoteUri}. Reason: {ex.Message}");
+                        return (handshake, stream);
                     }
-
-                    socket.SafeDispose();
-                    await Task.Delay(5000).ConfigureAwait(false);
                 }
+
+                await Task.Delay(5000).ConfigureAwait(false);
             }
+        }
+
+        private static async Task<(HandshakeMessage handshakeResponse, AsyncNetworkStream networkStream)> TryConnectoTo(
+            Uri remoteUri,
+            IPEndPoint remoteEp,
+            ILogger logger,
+            SolarWindHubOptions options)
+        {
+            Socket socket = remoteEp.BuildTcpSocket();
+            try
+            {
+                logger.LogInformation($"Connecting to '{remoteUri}' ({remoteEp})");
+
+                await socket
+                    .ConnectAsync(remoteEp)
+                    .ConfigureAwait(false);
+
+                logger.LogInformation($"Connected to '{remoteUri}' ({remoteEp})");
+
+                var networkStream = new AsyncNetworkStream(socket);
+
+                HandshakeMessage handshakeResponse = await networkStream
+                    .HandshakeAsClient(options.HubId, logger)
+                    .ConfigureAwait(false);
+
+                logger.LogInformation($"Successfully connected to '{handshakeResponse.HubId}' ({remoteUri})");
+
+                return (handshakeResponse, networkStream);
+            }
+            catch (Exception ex)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation($"Cannot connect to '{remoteUri}' ({remoteEp}). Reason: {ex.Message}");
+                }
+
+                socket.SafeDispose();
+            }
+
+            return (null, null);
         }
 
         private static void ConfigureSocket(Socket socket, SolarWindHubOptions options)

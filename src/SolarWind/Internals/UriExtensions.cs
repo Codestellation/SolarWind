@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Net;
-using System.Net.Sockets;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -12,28 +11,30 @@ namespace Codestellation.SolarWind.Internals
 
         public static bool UseTls(this Uri uri) => string.Equals(uri.Scheme, Tls, StringComparison.OrdinalIgnoreCase);
 
-        public static IPEndPoint ResolveLocalEndpoint(this Uri localUri)
+        public static IPEndPoint[] ResolveLocalEndpoint(this Uri localUri)
         {
             Uri uri = HandleWildcard(localUri);
 
             return uri.ResolveRemoteEndpoint();
         }
 
-        public static IPEndPoint ResolveRemoteEndpoint(this Uri remoteUri)
+        public static IPEndPoint[] ResolveRemoteEndpoint(this Uri remoteUri)
         {
-            if (!IPAddress.TryParse(remoteUri.Host, out IPAddress ipAddress))
+            if (IPAddress.TryParse(remoteUri.Host, out IPAddress ipAddress))
             {
-                ipAddress = Dns
-                    .GetHostAddresses(remoteUri.Host)
-                    .SingleOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+                return new[] {new IPEndPoint(ipAddress, remoteUri.Port)};
             }
 
-            if (ipAddress == null)
+
+            IPAddress[] ips = Dns.GetHostAddresses(remoteUri.Host);
+            if (ips == null || ips.Length == 0)
             {
                 throw new ArgumentException($"Could not resolve address {remoteUri}. Please notice IPv6 is not supported currently");
             }
 
-            return new IPEndPoint(ipAddress, remoteUri.Port);
+            return ips
+                .Select(x => new IPEndPoint(x, remoteUri.Port))
+                .ToArray();
         }
 
         private static Uri HandleWildcard(Uri localUri) =>

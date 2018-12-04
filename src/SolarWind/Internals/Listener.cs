@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Sockets;
-using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
@@ -9,97 +9,35 @@ namespace Codestellation.SolarWind.Internals
     internal class Listener : IDisposable
     {
         private readonly SolarWindHubOptions _hubOptions;
-        private readonly Socket _listener;
-        private bool _disposed;
-        private readonly SocketAsyncEventArgs _args;
-        private readonly ILogger<Listener> _logger;
-        private readonly ManualResetEventSlim _disposedWaitHandle;
+        private readonly ILogger _logger;
+        private readonly ConcurrentDictionary<IPEndPoint, ListenerWorker> _listeners;
 
         public Listener(SolarWindHubOptions hubOptions)
         {
-            _disposedWaitHandle = new ManualResetEventSlim(false);
-
+            _listeners = new ConcurrentDictionary<IPEndPoint, ListenerWorker>();
             _hubOptions = hubOptions;
-            _listener = Build.TcpIPv4();
-            _args = new SocketAsyncEventArgs();
-
             _logger = hubOptions.LoggerFactory.CreateLogger<Listener>();
         }
 
         public void Listen(Uri uri, Action<HubId, Connection> onAccepted)
         {
-            IPEndPoint endpoint = uri.ResolveLocalEndpoint();
-            _listener.Bind(endpoint);
-            _listener.Listen(10);
-            _args.Completed += (sender, e) => OnSocketAccepted(e, onAccepted);
+            IPEndPoint[] endPoints = uri.ResolveLocalEndpoint();
 
-            Listen(onAccepted);
-        }
-
-        private void Listen(Action<HubId, Connection> onAccepted)
-        {
-            if (_disposed)
+            foreach (IPEndPoint ipEndPoint in endPoints)
             {
-                _disposedWaitHandle.Set();
-                return;
-            }
-
-            try
-            {
-                _args.AcceptSocket = null;
-
-                if (!_listener.AcceptAsync(_args))
+                var worker = new ListenerWorker(ipEndPoint, _hubOptions, onAccepted);
+                if (_listeners.TryAdd(ipEndPoint, worker))
                 {
-                    //Completed synchronously
-                    OnSocketAccepted(_args, onAccepted);
+                    worker.Start();
+                }
+                else
+                {
+                    worker.Dispose();
                 }
             }
-            catch (Exception e)
-            {
-                if (_logger.IsEnabled(LogLevel.Error))
-                {
-                    _logger.LogError(e, "Failed to start listening");
-                }
-            }
-
-
-            //Operation started asynchronously, so exit now and wait for OnAccept callback 
-        }
-
-        private async void OnSocketAccepted(SocketAsyncEventArgs e, Action<HubId, Connection> onAccepted)
-        {
-            SocketError eSocketError = e.SocketError;
-            Socket argsAcceptSocket = _args.AcceptSocket;
-
-            //Enter next accept cycle
-            Listen(onAccepted);
-
-            if (eSocketError != SocketError.Success)
-            {
-                if (_logger.IsEnabled(LogLevel.Error))
-                {
-                    _logger.LogError($"Error accepting socket. Exception code = {(int)eSocketError} ({eSocketError})");
-                }
-
-                argsAcceptSocket.SafeDispose();
-            }
-            else
-            {
-                _logger.LogInformation($"Accepted socket from {e.AcceptSocket.RemoteEndPoint}");
-                await Connection
-                    .Accept(_hubOptions, argsAcceptSocket, onAccepted)
-                    .ConfigureAwait(false);
-            }
         }
 
 
-        public void Dispose()
-        {
-            _disposed = true;
-            _listener.Close();
-            _listener.Dispose();
-
-            _disposedWaitHandle.Wait(TimeSpan.FromSeconds(1));
-        }
+        public void Dispose() => Parallel.ForEach(_listeners, x => x.Value.Dispose());
     }
 }
