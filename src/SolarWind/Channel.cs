@@ -71,7 +71,7 @@ namespace Codestellation.SolarWind
         {
             _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
             CancellationTokenSource cancellation = _cancellationSource;
-            while (!cancellation.IsCancellationRequested)
+            while (!cancellation?.IsCancellationRequested ?? true)
             {
                 await Receive().ConfigureAwait(false);
             }
@@ -142,7 +142,7 @@ namespace Codestellation.SolarWind
 
             CancellationTokenSource cancellationTokenSource = _cancellationSource;
 
-            while (!cancellationTokenSource.IsCancellationRequested)
+            while (!cancellationTokenSource?.IsCancellationRequested ?? true)
             {
                 try
                 {
@@ -161,7 +161,7 @@ namespace Codestellation.SolarWind
                     Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
                     _batchLength = 0;
                 }
-                //It's my buggy realization. I have to enclose socket exception into IOException as other streams do. 
+                //It's my buggy realization. I have to enclose socket exception into IOException as other streams do.
                 catch (IOException ex)
                 {
                     _logger.LogDebug(ex, "Send error");
@@ -192,7 +192,7 @@ namespace Codestellation.SolarWind
                 .ConfigureAwait(false);
         }
 
-        //It's made internal to avoid occasional calls from user's code. 
+        //It's made internal to avoid occasional calls from user's code.
         internal void Dispose()
         {
             Stop(false);
