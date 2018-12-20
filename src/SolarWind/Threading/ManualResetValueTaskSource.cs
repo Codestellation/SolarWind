@@ -32,7 +32,7 @@ namespace Codestellation.SolarWind.Threading
         /// <summary>
         /// Use default task scheduler
         /// </summary>
-        ForceDefaultTaskScheduler
+        ContinueAsync
     }
 
 
@@ -329,7 +329,7 @@ namespace Codestellation.SolarWind.Threading
             object cc = _capturedContext;
             _capturedContext = null;
 
-            if (_options == ContinuationOptions.ForceDefaultTaskScheduler)
+            if (_options == ContinuationOptions.ContinueAsync)
             {
                 cc = TaskScheduler.Default;
             }

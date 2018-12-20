@@ -11,15 +11,15 @@ namespace Codestellation.SolarWind.Threading
     /// <typeparam name="T">Any type </typeparam>
     public class AwaitableQueue<T>
     {
+        private readonly ContinuationOptions _options;
         private readonly SimpleQueue<T> _queue;
-        private readonly AutoResetValueTaskSource<int> _source;
-        private bool _shouldNotify;
+        private CancellationTokenRegistration _cancellation;
+        private TaskCompletionSource<int> _source;
 
         public AwaitableQueue(ContinuationOptions options = ContinuationOptions.None)
         {
+            _options = options;
             _queue = new SimpleQueue<T>(10);
-            _source = new AutoResetValueTaskSource<int>(options);
-            _shouldNotify = false;
         }
 
         /// <summary>
@@ -30,10 +30,12 @@ namespace Codestellation.SolarWind.Threading
             lock (_queue)
             {
                 _queue.Enqueue(value);
-                if (_shouldNotify)
+
+                if (_source != null)
                 {
-                    _source.SetResult(0);
-                    _shouldNotify = false;
+                    _cancellation.Dispose();
+                    _source.TrySetResult(0);
+                    _source = null;
                 }
             }
         }
@@ -50,7 +52,7 @@ namespace Codestellation.SolarWind.Threading
         {
             lock (_queue)
             {
-                int count = Math.Min(batch.Length, _queue.Count);
+                var count = Math.Min(batch.Length, _queue.Count);
                 for (var i = 0; i < count; i++)
                 {
                     _queue.TryDequeue(out batch[i]);
@@ -74,8 +76,28 @@ namespace Codestellation.SolarWind.Threading
                     return new ValueTask(Task.CompletedTask);
                 }
 
-                _shouldNotify = true;
-                return _source.AwaitVoid(cancellation);
+                TaskCreationOptions options = _options == ContinuationOptions.ContinueAsync
+                    ? TaskCreationOptions.RunContinuationsAsynchronously
+                    : TaskCreationOptions.None;
+
+                _source = new TaskCompletionSource<int>(options);
+
+                _cancellation = cancellation.Register(CancelAwaiter);
+
+                return new ValueTask(_source.Task);
+            }
+        }
+
+        private void CancelAwaiter()
+        {
+            lock (_queue)
+            {
+                if (_source != null)
+                {
+                    _source.TrySetException(new TaskCanceledException());
+                    _source = null;
+                    _cancellation.Dispose();
+                }
             }
         }
 

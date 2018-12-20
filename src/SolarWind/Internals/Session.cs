@@ -34,14 +34,14 @@ namespace Codestellation.SolarWind.Internals
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
-            _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ForceDefaultTaskScheduler);
-            _outgoingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceDefaultTaskScheduler);
+            _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ContinueAsync);
+            _outgoingQueue = new AwaitableQueue<Message>(ContinuationOptions.ContinueAsync);
 
             _processedMessages = new PreemptiveHashSet<MessageId>(256 * 1024);
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
             // message processing as well and thus stop reading all the sockets. 
-            _incomingQueue = new AwaitableQueue<Message>(ContinuationOptions.ForceDefaultTaskScheduler);
+            _incomingQueue = new AwaitableQueue<Message>(ContinuationOptions.ContinueAsync);
             _disposal = new CancellationTokenSource();
 
             _currentMessageId = MessageId.Initialize();

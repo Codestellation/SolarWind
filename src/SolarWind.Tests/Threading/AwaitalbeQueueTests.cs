@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace Codestellation.SolarWind.Tests.Threading
 {
     [TestFixture(ContinuationOptions.None)]
-    [TestFixture(ContinuationOptions.ForceDefaultTaskScheduler)]
+    [TestFixture(ContinuationOptions.ContinueAsync)]
     public class AwaitalbeQueueTests
     {
         private readonly ContinuationOptions _options;
