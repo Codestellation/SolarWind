@@ -30,6 +30,12 @@ namespace Codestellation.SolarWind.Internals
                 throw new InvalidOperationException("Non array base memory is supported for .net core 2.1+ only");
             }
 
+            if (Socket.Available > 0)
+            {
+                int bytesToRead = Math.Min(segment.Count, Socket.Available);
+                return Socket.Receive(segment.Array, segment.Offset, bytesToRead, SocketFlags.None);
+            }
+
             var source = new TaskCompletionSource<int>();
             var args = new SocketAsyncEventArgs {UserToken = source};
             args.Completed += HandleAsyncResult;
@@ -39,6 +45,9 @@ namespace Codestellation.SolarWind.Internals
             {
                 return await source.Task.ConfigureAwait(false);
             }
+
+            args.Completed -= HandleAsyncResult;
+            args.UserToken = null;
 
             return args.BytesTransferred;
         }
@@ -60,27 +69,37 @@ namespace Codestellation.SolarWind.Internals
             {
                 int realOffset = segment.Offset + sent;
 
-                var source = new TaskCompletionSource<int>();
-                var args = new SocketAsyncEventArgs {UserToken = source};
-                args.Completed += HandleAsyncResult;
-                args.SetBuffer(segment.Array, segment.Offset, segment.Count);
-                args.SetBuffer(segment.Array, realOffset, left);
-
-                if (Socket.SendAsync(args))
+                if (Socket.Poll(0, SelectMode.SelectWrite))
                 {
-                    sent += await source.Task.ConfigureAwait(false);
+                    sent += Socket.Send(segment.Array, realOffset, segment.Count, SocketFlags.None);
                 }
                 else
                 {
-                    //Operation has completed synchronously
-                    if (args.SocketError == SocketError.Success)
+                    var source = new TaskCompletionSource<int>();
+                    var args = new SocketAsyncEventArgs {UserToken = source};
+                    args.Completed += HandleAsyncResult;
+
+                    args.SetBuffer(segment.Array, realOffset, left);
+
+                    if (Socket.SendAsync(args))
                     {
-                        sent += args.BytesTransferred;
+                        sent += await source.Task.ConfigureAwait(false);
                     }
                     else
                     {
-                        SocketError socketError = args.SocketError;
-                        ThrowException(socketError);
+                        //Operation has completed synchronously
+                        if (args.SocketError == SocketError.Success)
+                        {
+                            sent += args.BytesTransferred;
+                        }
+                        else
+                        {
+                            SocketError socketError = args.SocketError;
+                            ThrowException(socketError);
+                        }
+
+                        args.Completed -= HandleAsyncResult;
+                        args.UserToken = null;
                     }
                 }
 
@@ -96,6 +115,7 @@ namespace Codestellation.SolarWind.Internals
             //TaskCompletionSource<int> copy = source;
             //source = null;
             var source = (TaskCompletionSource<int>)e.UserToken;
+
             if (e.SocketError != SocketError.Success)
             {
                 source.TrySetException(BuildIoException(e.SocketError));
@@ -110,6 +130,9 @@ namespace Codestellation.SolarWind.Internals
             {
                 source.TrySetResult(e.BytesTransferred);
             }
+
+            e.UserToken = null;
+            e.Completed -= HandleAsyncResult;
         }
 
         private static void ThrowException(SocketError socketError) => throw BuildIoException(socketError);
