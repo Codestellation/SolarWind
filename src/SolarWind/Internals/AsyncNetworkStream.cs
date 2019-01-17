@@ -48,7 +48,7 @@ namespace Codestellation.SolarWind.Internals
 
             args.Completed -= HandleAsyncResult;
             args.UserToken = null;
-
+            args.Dispose();
             return args.BytesTransferred;
         }
 
@@ -100,6 +100,7 @@ namespace Codestellation.SolarWind.Internals
 
                         args.Completed -= HandleAsyncResult;
                         args.UserToken = null;
+                        args.Dispose();
                     }
                 }
 
@@ -133,6 +134,7 @@ namespace Codestellation.SolarWind.Internals
 
             e.UserToken = null;
             e.Completed -= HandleAsyncResult;
+            e.Dispose();
         }
 
         private static void ThrowException(SocketError socketError) => throw BuildIoException(socketError);
