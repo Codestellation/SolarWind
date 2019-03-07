@@ -69,7 +69,10 @@ namespace Codestellation.SolarWind
                 return result;
             }
 
-            result = new Channel(options, _hubOptions.LoggerFactory);
+            result = new Channel(options, _hubOptions.LoggerFactory)
+            {
+                RemoteUri = remoteUri
+            };
             Channel added = _outChannels.GetOrAdd(remoteUri, result);
             //Another thread was lucky to add it first. So return his result
             if (added != result)
@@ -109,12 +112,29 @@ namespace Codestellation.SolarWind
             Parallel.ForEach(_channels, c => c.Value.Dispose());
         }
 
+        public void CloseChannel(Channel channel)
+        {
+            if (channel == null)
+            {
+                throw new ArgumentNullException(nameof(channel));
+            }
+
+            _channels.TryRemove(channel.ChannelId, out _);
+            _remoteIndex.TryRemove(channel.RemoteHubId, out _);
+            if (channel.RemoteUri != null)
+            {
+                _outChannels.TryRemove(channel.RemoteUri, out _);
+            }
+
+            channel.Dispose();
+        }
+
         private void OnConnected(Uri remoteUri, HubId remoteHubId, Connection connection)
         {
             Channel channel = _outChannels[remoteUri];
             channel.RemoteHubId = remoteHubId;
-            var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
-            _channels.TryAdd(channelId, channel);
+            channel.ChannelId = new ChannelId(_hubOptions.HubId, remoteHubId);
+            _channels.TryAdd(channel.ChannelId, channel);
             _remoteIndex.TryAdd(remoteHubId, channel);
             channel.OnReconnect(connection);
         }
@@ -124,6 +144,7 @@ namespace Codestellation.SolarWind
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
 
             Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote), _hubOptions.LoggerFactory) {RemoteHubId = remoteHubId});
+            channel.ChannelId = channelId;
             _remoteIndex.TryAdd(remoteHubId, channel);
             after(channelId, channel);
 

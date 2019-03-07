@@ -25,6 +25,9 @@ namespace Codestellation.SolarWind
 
         public HubId RemoteHubId { get; internal set; }
 
+        internal ChannelId ChannelId { get; set; }
+        internal Uri RemoteUri { get; set; }
+
         public Channel(ChannelOptions options, ILoggerFactory factory)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));

@@ -46,10 +46,11 @@ namespace Codestellation.SolarWind.Internals
                 return await source.Task.ConfigureAwait(false);
             }
 
+            int transferred = args.BytesTransferred;
             args.Completed -= HandleAsyncResult;
             args.UserToken = null;
             args.Dispose();
-            return args.BytesTransferred;
+            return transferred;
         }
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
