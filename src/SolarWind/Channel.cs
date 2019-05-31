@@ -74,7 +74,7 @@ namespace Codestellation.SolarWind
         {
             _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
             CancellationTokenSource cancellation = _cancellationSource;
-            while (!cancellation?.IsCancellationRequested ?? true)
+            while (!(cancellation?.IsCancellationRequested ?? true))
             {
                 await Receive().ConfigureAwait(false);
             }
@@ -143,22 +143,22 @@ namespace Codestellation.SolarWind
         {
             _logger.LogInformation($"Starting writing to {RemoteHubId.Id}");
 
-            CancellationTokenSource cancellationTokenSource = _cancellationSource;
+            CancellationTokenSource cancellation = _cancellationSource;
 
-            while (!cancellationTokenSource?.IsCancellationRequested ?? true)
+            while (!(cancellation?.IsCancellationRequested ?? true))
             {
                 try
                 {
                     _logger.LogDebug($"Dequeuing batch to send to {RemoteHubId.ToString()}");
-                    while (!cancellationTokenSource.IsCancellationRequested
+                    while (!cancellation.IsCancellationRequested
                            && _batchLength == 0 //Batch was not send due to exception. will try to resend it
                            && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
                     {
-                        await _session.AwaitOutgoing(cancellationTokenSource.Token).ConfigureAwait(false);
+                        await _session.AwaitOutgoing(cancellation.Token).ConfigureAwait(false);
                     }
 
                     _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
-                    await TrySendBatch(cancellationTokenSource).ConfigureAwait(false);
+                    await TrySendBatch(cancellation).ConfigureAwait(false);
 
                     Array.ForEach(_batch, m => m.Dispose());
                     Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
