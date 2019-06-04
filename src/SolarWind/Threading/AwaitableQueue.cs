@@ -92,9 +92,8 @@ namespace Codestellation.SolarWind.Threading
         {
             lock (_queue)
             {
-                if (_source != null)
+                if (_source != null && _source.TrySetCanceled())
                 {
-                    _source.TrySetException(new TaskCanceledException());
                     _source = null;
                     _cancellation.Dispose();
                 }
@@ -110,6 +109,7 @@ namespace Codestellation.SolarWind.Threading
 
             lock (_queue)
             {
+                CancelAwaiter();
                 while (_queue.TryDequeue(out T result))
                 {
                     onDispose(result);
