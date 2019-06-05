@@ -14,7 +14,7 @@ namespace Codestellation.SolarWind.Threading
         private readonly ContinuationOptions _options;
         private readonly SimpleQueue<T> _queue;
         private CancellationTokenRegistration _cancellation;
-        private TaskCompletionSource<int> _source;
+        private volatile TaskCompletionSource<int> _source;
 
         public AwaitableQueue(ContinuationOptions options = ContinuationOptions.None)
         {
@@ -74,6 +74,11 @@ namespace Codestellation.SolarWind.Threading
                 if (_queue.Count > 0)
                 {
                     return new ValueTask(Task.CompletedTask);
+                }
+
+                if (cancellation.IsCancellationRequested)
+                {
+                    return new ValueTask(Task.FromCanceled(cancellation));
                 }
 
                 TaskCreationOptions options = _options == ContinuationOptions.ContinueAsync

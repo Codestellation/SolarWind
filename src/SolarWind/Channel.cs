@@ -13,10 +13,10 @@ namespace Codestellation.SolarWind
     /// </summary>
     public class Channel
     {
-        private Connection _connection;
+        private volatile Connection _connection;
         private readonly ChannelOptions _options;
 
-        private CancellationTokenSource _cancellationSource;
+        private volatile CancellationTokenSource _cancellationSource;
         private readonly Session _session;
         private SolarWindCallback _callback;
         private readonly ILogger<Channel> _logger;
