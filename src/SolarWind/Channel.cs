@@ -50,8 +50,8 @@ namespace Codestellation.SolarWind
             _cancellationSource = new CancellationTokenSource();
             _connection = connection;
 
-            Task.Run(StartReadingTask);
-            Task.Run(StartWritingTask);
+            Task.Run(StartReadingTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+            Task.Run(StartWritingTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         /// <summary>
@@ -218,6 +218,12 @@ namespace Codestellation.SolarWind
             {
                 _connection.Reconnect();
             }
+        }
+
+        private void LogAndFail(Task task)
+        {
+            _logger.LogCritical(task.Exception, "Task failed.");
+            Environment.FailFast("Task failed", task.Exception);
         }
     }
 }

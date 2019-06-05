@@ -46,8 +46,8 @@ namespace Codestellation.SolarWind.Internals
 
             _currentMessageId = MessageId.Initialize();
 
-            Task.Run(StartSerializationTask);
-            Task.Run(StartDeserializationTask);
+            Task.Run(StartSerializationTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+            Task.Run(StartDeserializationTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         private async Task StartSerializationTask()
@@ -190,6 +190,12 @@ namespace Codestellation.SolarWind.Internals
             _incomingQueue.Dispose(m => m.Dispose());
             _outgoingQueue.Dispose(m => m.Dispose());
             _serializationQueue.Dispose(m => { });
+        }
+
+        private void LogAndFail(Task task)
+        {
+            _logger.LogCritical(task.Exception, "Task failed.");
+            Environment.FailFast("Task failed", task.Exception);
         }
     }
 }
