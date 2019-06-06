@@ -74,24 +74,24 @@ namespace Codestellation.SolarWind
         {
             _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
             CancellationTokenSource cancellation = _cancellationSource;
-            while (!(cancellation?.IsCancellationRequested ?? true))
+            while (cancellation != null && !cancellation.IsCancellationRequested)
             {
-                await Receive().ConfigureAwait(false);
+                await Receive(cancellation.Token).ConfigureAwait(false);
             }
         }
 
-        private async ValueTask Receive()
+        private async ValueTask Receive(CancellationToken token)
         {
             var buffer = new PooledMemoryStream();
             Message message;
             try
             {
-                await Receive(buffer, WireHeader.Size).ConfigureAwait(false);
+                await Receive(buffer, WireHeader.Size, token).ConfigureAwait(false);
                 buffer.Position = 0;
                 WireHeader wireHeader = WireHeader.ReadFrom(buffer);
                 buffer.Reset();
 
-                await Receive(buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
+                await Receive(buffer, wireHeader.PayloadSize.Value, token).ConfigureAwait(false);
                 buffer.Position = 0;
                 message = new Message(wireHeader.MessageHeader, buffer);
 
@@ -137,7 +137,8 @@ namespace Codestellation.SolarWind
             }
         }
 
-        private ValueTask Receive(PooledMemoryStream buffer, int count) => _connection.ReceiveAsync(buffer, count, _cancellationSource.Token);
+        private ValueTask Receive(PooledMemoryStream buffer, int count, CancellationToken token)
+            => _connection.ReceiveAsync(buffer, count, token);
 
         private async Task StartWritingTask()
         {
@@ -145,7 +146,7 @@ namespace Codestellation.SolarWind
 
             CancellationTokenSource cancellation = _cancellationSource;
 
-            while (!(cancellation?.IsCancellationRequested ?? true))
+            while (cancellation != null && !cancellation.IsCancellationRequested)
             {
                 try
                 {
