@@ -16,6 +16,10 @@ namespace Codestellation.SolarWind
         private volatile Connection _connection;
         private readonly ChannelOptions _options;
 
+        private volatile int _disposed;
+        private const int Disposed = 1;
+        private const int NotDisposed = 0;
+
         private volatile CancellationTokenSource _cancellationSource;
         private readonly Session _session;
         private SolarWindCallback _callback;
@@ -44,6 +48,8 @@ namespace Codestellation.SolarWind
 
         internal void OnReconnect(Connection connection)
         {
+            EnsureNotDisposed();
+
             _logger.LogInformation($"Reconnected to {RemoteHubId}");
             Stop(false);
 
@@ -61,14 +67,20 @@ namespace Codestellation.SolarWind
         /// <param name="replyTo">An id of the message which replies to</param>
         /// <returns>An assigned id to the outgoing message</returns>
         public MessageId Post(object data, MessageId replyTo = default)
-            => _session.EnqueueOutgoing(data, replyTo);
+        {
+            EnsureNotDisposed();
+            return _session.EnqueueOutgoing(data, replyTo);
+        }
 
         /// <summary>
         /// Sets callback for the channel. Previous callback will be replaced with the supplied one.
         /// </summary>
         /// <param name="callback"></param>
         public void SetCallback(SolarWindCallback callback)
-            => _callback = callback ?? throw new ArgumentNullException(nameof(callback));
+        {
+            EnsureNotDisposed();
+            _callback = callback ?? throw new ArgumentNullException(nameof(callback));
+        }
 
         private async Task StartReadingTask()
         {
@@ -197,10 +209,14 @@ namespace Codestellation.SolarWind
         }
 
         //It's made internal to avoid occasional calls from user's code.
+
         internal void Dispose()
         {
-            Stop(false);
-            _session.Dispose();
+            if (Interlocked.CompareExchange(ref _disposed, Disposed, NotDisposed) == NotDisposed)
+            {
+                Stop(false);
+                _session.Dispose();
+            }
         }
 
         private void Stop(bool reconnect)
@@ -224,7 +240,15 @@ namespace Codestellation.SolarWind
         private void LogAndFail(Task task)
         {
             _logger.LogCritical(task.Exception, "Task failed:");
-            Environment.FailFast("Task failed: " + task.Exception, task.Exception);
+            Environment.FailFast($"Task failed: {task.Exception}", task.Exception);
+        }
+
+        private void EnsureNotDisposed()
+        {
+            if (_disposed == Disposed)
+            {
+                throw new ObjectDisposedException(ChannelId.ToString());
+            }
         }
     }
 }

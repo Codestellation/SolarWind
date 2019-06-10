@@ -107,7 +107,6 @@ namespace Codestellation.SolarWind
 
             _disposed = true;
 
-
             _listener.Dispose();
             Parallel.ForEach(_channels, c => c.Value.Dispose());
         }

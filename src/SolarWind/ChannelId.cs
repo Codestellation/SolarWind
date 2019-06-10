@@ -54,5 +54,8 @@ namespace Codestellation.SolarWind
         /// </summary>
         /// <returns>True if left and right operands are not equal</returns>
         public static bool operator !=(ChannelId left, ChannelId right) => !left.Equals(right);
+
+
+        public override string ToString() => $"{Local.Id}<->{Remote.Id}";
     }
 }
