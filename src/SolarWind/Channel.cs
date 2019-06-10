@@ -53,11 +53,20 @@ namespace Codestellation.SolarWind
             _logger.LogInformation($"Reconnected to {RemoteHubId}");
             Stop(false);
 
-            _cancellationSource = new CancellationTokenSource();
+            var cancellation = new CancellationTokenSource();
+
+            if (Interlocked.CompareExchange(ref _cancellationSource, cancellation, null) != null)
+            {
+                //Possible a bug here so not more than one connection must exist between hubs
+                connection.Dispose();
+                return;
+            }
+
+            _cancellationSource = cancellation;
             _connection = connection;
 
-            Task.Run(StartReadingTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
-            Task.Run(StartWritingTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+            Task.Run(() => StartReadingTask(cancellation.Token)).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+            Task.Run(() => StartWritingTask(cancellation.Token)).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         /// <summary>
@@ -82,13 +91,12 @@ namespace Codestellation.SolarWind
             _callback = callback ?? throw new ArgumentNullException(nameof(callback));
         }
 
-        private async Task StartReadingTask()
+        private async Task StartReadingTask(CancellationToken cancellation)
         {
             _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
-            CancellationTokenSource cancellation = _cancellationSource;
-            while (cancellation != null && !cancellation.IsCancellationRequested)
+            while (!cancellation.IsCancellationRequested)
             {
-                await Receive(cancellation.Token).ConfigureAwait(false);
+                await Receive(cancellation).ConfigureAwait(false);
             }
         }
 
@@ -152,13 +160,11 @@ namespace Codestellation.SolarWind
         private ValueTask Receive(PooledMemoryStream buffer, int count, CancellationToken token)
             => _connection.ReceiveAsync(buffer, count, token);
 
-        private async Task StartWritingTask()
+        private async Task StartWritingTask(CancellationToken cancellation)
         {
             _logger.LogInformation($"Starting writing to {RemoteHubId.Id}");
 
-            CancellationTokenSource cancellation = _cancellationSource;
-
-            while (cancellation != null && !cancellation.IsCancellationRequested)
+            while (!cancellation.IsCancellationRequested)
             {
                 try
                 {
@@ -167,7 +173,7 @@ namespace Codestellation.SolarWind
                            && _batchLength == 0 //Batch was not send due to exception. will try to resend it
                            && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
                     {
-                        await _session.AwaitOutgoing(cancellation.Token).ConfigureAwait(false);
+                        await _session.AwaitOutgoing(cancellation).ConfigureAwait(false);
                     }
 
                     _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
@@ -193,18 +199,18 @@ namespace Codestellation.SolarWind
             }
         }
 
-        private async Task TrySendBatch(CancellationTokenSource cancellationTokenSource)
+        private async Task TrySendBatch(CancellationToken cancellation)
         {
             for (var i = 0; i < _batchLength; i++)
             {
                 //_logger.LogDebug($"Writing message {message.Header.ToString()}");
                 await _connection
-                    .WriteAsync(_batch[i], cancellationTokenSource.Token)
+                    .WriteAsync(_batch[i], cancellation)
                     .ConfigureAwait(false);
             }
 
             await _connection
-                .FlushAsync(cancellationTokenSource.Token)
+                .FlushAsync(cancellation)
                 .ConfigureAwait(false);
         }
 
