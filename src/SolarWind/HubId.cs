@@ -34,6 +34,6 @@ namespace Codestellation.SolarWind
         /// <inheritdoc />
         public override string ToString() => Id;
 
-        public static HubId Generate() => new HubId($"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}");    
+        public static HubId Generate() => new HubId($"{Environment.MachineName}:{Process.GetCurrentProcess().ProcessName}:{Process.GetCurrentProcess().Id}");
     }
 }
