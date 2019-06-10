@@ -173,10 +173,6 @@ namespace Codestellation.SolarWind.Internals
             }
 
             _serializationQueue.Enqueue((id, replyTo, data));
-            //if (_logger.IsEnabled(LogLevel.Debug))
-            //{
-            //    _logger.LogDebug($"Enqueued msg {id.ToString()}");
-            //}
             return id;
         }
 
@@ -195,7 +191,7 @@ namespace Codestellation.SolarWind.Internals
         private void LogAndFail(Task task)
         {
             _logger.LogCritical(task.Exception, "Task failed.");
-            Environment.FailFast("Task failed", task.Exception);
+            Environment.FailFast($"Task failed: {task.Exception}", task.Exception);
         }
     }
 }

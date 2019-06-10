@@ -223,8 +223,8 @@ namespace Codestellation.SolarWind
 
         private void LogAndFail(Task task)
         {
-            _logger.LogCritical(task.Exception, "Task failed.");
-            Environment.FailFast("Task failed", task.Exception);
+            _logger.LogCritical(task.Exception, "Task failed:");
+            Environment.FailFast("Task failed: " + task.Exception, task.Exception);
         }
     }
 }
