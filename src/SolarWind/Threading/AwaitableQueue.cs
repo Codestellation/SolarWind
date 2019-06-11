@@ -11,15 +11,13 @@ namespace Codestellation.SolarWind.Threading
     /// <typeparam name="T">Any type </typeparam>
     public class AwaitableQueue<T>
     {
-        private readonly ContinuationOptions _options;
         private readonly SimpleQueue<T> _queue;
-        private CancellationTokenRegistration _cancellation;
-        private volatile TaskCompletionSource<int> _source;
+        private SemaphoreSlim _lock;
 
         public AwaitableQueue(ContinuationOptions options = ContinuationOptions.None)
         {
-            _options = options;
             _queue = new SimpleQueue<T>(10);
+            _lock = new SemaphoreSlim(0);
         }
 
         /// <summary>
@@ -30,13 +28,7 @@ namespace Codestellation.SolarWind.Threading
             lock (_queue)
             {
                 _queue.Enqueue(value);
-
-                if (_source != null)
-                {
-                    _cancellation.Dispose();
-                    _source.TrySetResult(0);
-                    _source = null;
-                }
+                _lock.Release();
             }
         }
 
@@ -44,8 +36,15 @@ namespace Codestellation.SolarWind.Threading
         {
             lock (_queue)
             {
-                return _queue.TryDequeue(out value);
+                if (_queue.TryDequeue(out value))
+                {
+                    _lock.Wait(0);//Decreases message item counter to avoid false sense of present messages
+                    return true;
+                }
+
+                return false;
             }
+
         }
 
         public int TryDequeueBatch(T[] batch)
@@ -58,6 +57,10 @@ namespace Codestellation.SolarWind.Threading
                     _queue.TryDequeue(out batch[i]);
                 }
 
+                if (count > 0)
+                {
+                    _lock.Release(count);
+                }
                 return count;
             }
         }
@@ -81,27 +84,7 @@ namespace Codestellation.SolarWind.Threading
                     return new ValueTask(Task.FromCanceled(cancellation));
                 }
 
-                TaskCreationOptions options = _options == ContinuationOptions.ContinueAsync
-                    ? TaskCreationOptions.RunContinuationsAsynchronously
-                    : TaskCreationOptions.None;
-
-                _source = new TaskCompletionSource<int>(options);
-
-                _cancellation = cancellation.Register(CancelAwaiter);
-
-                return new ValueTask(_source.Task);
-            }
-        }
-
-        private void CancelAwaiter()
-        {
-            lock (_queue)
-            {
-                if (_source != null && _source.TrySetCanceled())
-                {
-                    _source = null;
-                    _cancellation.Dispose();
-                }
+                return new ValueTask(_lock.WaitAsync(cancellation));
             }
         }
 
@@ -114,7 +97,6 @@ namespace Codestellation.SolarWind.Threading
 
             lock (_queue)
             {
-                CancelAwaiter();
                 while (_queue.TryDequeue(out T result))
                 {
                     onDispose(result);
