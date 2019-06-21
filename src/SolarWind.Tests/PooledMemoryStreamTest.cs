@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Codestellation.SolarWind.Internals;
 using FluentAssertions;
@@ -64,7 +65,7 @@ namespace Codestellation.SolarWind.Tests
 
                 bytesRead.Should().Be(origin.Length);
                 stream.Position.Should().Be(origin.Length);
-                actual.Should().BeEquivalentTo(origin);
+                AssertStreamsAreEqual(actual, origin);
             }
         }
 
@@ -84,8 +85,20 @@ namespace Codestellation.SolarWind.Tests
                 stream.Position = 0;
                 int readBytes = stream.Read(actual, 0, actual.Length);
 
-
                 readBytes.Should().Be(origin.Length);
+                AssertStreamsAreEqual(actual, origin);
+            }
+        }
+
+        private static void AssertStreamsAreEqual(byte[] actual, byte[] origin)
+        {
+            Span<byte> actualSpan = actual;
+            Span<byte> originSpan = origin;
+
+            // Comparing big arrays with fluent assertions is costly.
+            // So let's compare it fast at first, and make a good message with Should() in case of discrepancies
+            if (!actualSpan.SequenceEqual(originSpan))
+            {
                 actual.Should().BeEquivalentTo(origin);
             }
         }
