@@ -103,43 +103,34 @@ namespace Codestellation.SolarWind
         private async ValueTask Receive(CancellationToken token)
         {
             var buffer = new PooledMemoryStream();
-            Message message;
             try
             {
-                await Receive(buffer, WireHeader.Size, token).ConfigureAwait(false);
+                await _connection.ReceiveAsync(buffer, WireHeader.Size, token).ConfigureAwait(false);
                 buffer.Position = 0;
                 WireHeader wireHeader = WireHeader.ReadFrom(buffer);
                 buffer.Reset();
 
-                await Receive(buffer, wireHeader.PayloadSize.Value, token).ConfigureAwait(false);
+                await _connection.ReceiveAsync(buffer, wireHeader.PayloadSize.Value, token).ConfigureAwait(false);
                 buffer.Position = 0;
-                message = new Message(wireHeader.MessageHeader, buffer);
+                var message = new Message(wireHeader.MessageHeader, buffer);
 
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
                     _logger.LogDebug($"Received {message.Header.ToString()}");
                 }
+                _session.EnqueueIncoming(message);
             }
+            //Note: do not handle other exception types. These would mean something went completely wrong and we'd better know it asap
             catch (IOException ex)
             {
+                buffer.Dispose();
                 _logger.LogInformation(ex, "Receive Error.");
                 Stop(true);
-                buffer.Dispose();
-                return;
             }
             catch (OperationCanceledException)
             {
                 buffer.Dispose();
-                return;
             }
-            catch (Exception ex)
-            {
-                buffer.Dispose();
-                _logger.LogError(ex, "Receive error");
-                return;
-            }
-
-            _session.EnqueueIncoming(message);
         }
 
         private void OnIncomingMessage(in MessageHeader header, object data)
@@ -156,9 +147,6 @@ namespace Codestellation.SolarWind
                 }
             }
         }
-
-        private ValueTask Receive(PooledMemoryStream buffer, int count, CancellationToken token)
-            => _connection.ReceiveAsync(buffer, count, token);
 
         private async Task StartWritingTask(CancellationToken cancellation)
         {
@@ -183,12 +171,11 @@ namespace Codestellation.SolarWind
                     Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
                     _batchLength = 0;
                 }
-                //It's my buggy realization. I have to enclose socket exception into IOException as other streams do.
+                //Note: do not handle other exception types. These would mean something went completely wrong and we'd better know it asap
                 catch (IOException ex)
                 {
                     _logger.LogDebug(ex, "Send error");
                     Stop(true);
-
                     break;
                 }
                 catch (OperationCanceledException)

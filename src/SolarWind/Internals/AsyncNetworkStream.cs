@@ -29,12 +29,38 @@ namespace Codestellation.SolarWind.Internals
             {
                 throw new InvalidOperationException("Non array base memory is supported for .net core 2.1+ only");
             }
-
-            if (Socket.Available > 0)
+            try
             {
-                int bytesToRead = Math.Min(segment.Count, Socket.Available);
-                return Socket.Receive(segment.Array, segment.Offset, bytesToRead, SocketFlags.None);
+                if (TryReceiveSyncNonBlock(segment, out int received))
+                {
+                    return received;
+                }
+
+                return await ReceiveAsync(segment).ConfigureAwait(false);
             }
+            catch (Exception ex) when (ex is SocketException || ex is ObjectDisposedException)
+            {
+                throw new IOException("Receive failed", ex);
+            }
+        }
+
+        private bool TryReceiveSyncNonBlock(in ArraySegment<byte> segment, out int received)
+        {
+
+            if (Socket.Available == 0)
+            {
+                received = 0;
+                return false;
+            }
+
+            int bytesToRead = Math.Min(segment.Count, Socket.Available);
+            received = Socket.Receive(segment.Array, segment.Offset, bytesToRead, SocketFlags.None);
+            return true;
+
+        }
+
+        private async Task<int> ReceiveAsync(ArraySegment<byte> segment)
+        {
 
             var source = new TaskCompletionSource<int>();
             var args = new SocketAsyncEventArgs {UserToken = source};
@@ -53,6 +79,8 @@ namespace Codestellation.SolarWind.Internals
             return transferred;
         }
 
+
+
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
             WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
 
@@ -70,42 +98,56 @@ namespace Codestellation.SolarWind.Internals
             {
                 int realOffset = segment.Offset + sent;
 
-                if (Socket.Poll(0, SelectMode.SelectWrite))
+                if (!TrySendSyncNonBlock(ref sent, in segment, realOffset))
                 {
-                    sent += Socket.Send(segment.Array, realOffset, segment.Count, SocketFlags.None);
-                }
-                else
-                {
-                    var source = new TaskCompletionSource<int>();
-                    var args = new SocketAsyncEventArgs {UserToken = source};
-                    args.Completed += HandleAsyncResult;
-
-                    args.SetBuffer(segment.Array, realOffset, left);
-
-                    if (Socket.SendAsync(args))
-                    {
-                        sent += await source.Task.ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        //Operation has completed synchronously
-                        if (args.SocketError == SocketError.Success)
-                        {
-                            sent += args.BytesTransferred;
-                        }
-                        else
-                        {
-                            SocketError socketError = args.SocketError;
-                            ThrowException(socketError);
-                        }
-
-                        args.Completed -= HandleAsyncResult;
-                        args.UserToken = null;
-                        args.Dispose();
-                    }
+                    sent += await SendAsync(segment, realOffset, left).ConfigureAwait(false);
                 }
 
                 left = from.Length - sent;
+            }
+        }
+
+        private async Task<int> SendAsync(ArraySegment<byte> segment, int realOffset, int left)
+        {
+            var source = new TaskCompletionSource<int>();
+            var args = new SocketAsyncEventArgs {UserToken = source};
+            args.Completed += HandleAsyncResult;
+
+            args.SetBuffer(segment.Array, realOffset, left);
+
+            if (Socket.SendAsync(args))
+            {
+                return await source.Task.ConfigureAwait(false);
+            }
+
+            args.Completed -= HandleAsyncResult;
+            args.UserToken = null;
+            args.Dispose();
+
+            //Operation has completed synchronously
+            if (args.SocketError == SocketError.Success)
+            {
+                return args.BytesTransferred;
+            }
+
+            throw BuildIoException(args.SocketError);
+        }
+
+        private bool TrySendSyncNonBlock(ref int sent, in ArraySegment<byte> segment, int realOffset)
+        {
+            try
+            {
+                if (!Socket.Poll(0, SelectMode.SelectWrite))
+                {
+                    return false;
+                }
+
+                sent += Socket.Send(segment.Array, realOffset, segment.Count, SocketFlags.None);
+                return true;
+            }
+            catch (Exception ex) when(ex is SocketException || ex is ObjectDisposedException)
+            {
+                throw new IOException("Send failed", ex);
             }
         }
 
@@ -137,8 +179,6 @@ namespace Codestellation.SolarWind.Internals
             e.Completed -= HandleAsyncResult;
             e.Dispose();
         }
-
-        private static void ThrowException(SocketError socketError) => throw BuildIoException(socketError);
 
         private static IOException BuildConnectionClosedException() => BuildIoException(SocketError.SocketError, "The counterpart has closed the connection");
 
