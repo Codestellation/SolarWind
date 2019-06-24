@@ -14,7 +14,8 @@ namespace Codestellation.SolarWind.Internals
         private readonly ILogger _logger;
         private readonly Action _reconnect;
         private readonly DuplexBufferedStream _mainStream;
-
+        private bool _disposed;
+        public bool Connected => !_disposed;
 
         private Connection(AsyncNetworkStream networkStream, ILogger logger, Action reconnect)
         {
@@ -166,6 +167,7 @@ namespace Codestellation.SolarWind.Internals
 
         public void Dispose()
         {
+            _disposed = true;
             _mainStream.Close();
             _mainStream.Dispose();
         }

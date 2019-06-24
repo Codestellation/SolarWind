@@ -24,6 +24,7 @@ namespace Codestellation.SolarWind.Tests
         private Uri _uri;
         private MemoryStream _messageBuffer;
         private HubId _clientHubId;
+        private ManualResetEvent _keepAliveRaised;
 
         [SetUp]
         public void Setup()
@@ -32,7 +33,7 @@ namespace Codestellation.SolarWind.Tests
 
             _hub = new SolarWindHub(options);
             _uri = new Uri("tcp://localhost:4312");
-            _hub.Listen(new ServerOptions(_uri, _ => new ChannelOptions(JsonNetSerializer.Instance, OnCallback), delegate { }));
+            _hub.Listen(new ServerOptions(_uri, _ => new ChannelOptions(JsonNetSerializer.Instance, OnCallback) {KeepAliveTimeout = TimeSpan.FromSeconds(3)}, RaiseTimeOutEvent));
 
 
             var header = new MessageHeader(new MessageTypeId(1), MessageId.Empty, MessageId.Empty);
@@ -43,6 +44,12 @@ namespace Codestellation.SolarWind.Tests
             JsonNetSerializer.Instance.SerializeMessage(_messageBuffer, in header, data);
 
             _clientHubId = new HubId("client");
+            _keepAliveRaised = new ManualResetEvent(false);
+        }
+
+        private void RaiseTimeOutEvent(ChannelId channelid, Channel channel)
+        {
+            channel.OnKeepAliveTimeout += _ => _keepAliveRaised.Set();
         }
 
         [TearDown]
@@ -99,6 +106,21 @@ namespace Codestellation.SolarWind.Tests
 
                 AssertReceived(client);
             }
+        }
+
+
+        [Test]
+        public void Should_raise_on_keep_alive_timeout_event()
+        {
+            using (TcpClient client = CreateClient())
+            {
+                client.Client.Send(_messageBuffer.GetBuffer(), 0, (int)_messageBuffer.Position, SocketFlags.None);
+
+                AssertReceived(client);
+                client.Close();
+            }
+
+            Assert.That(_keepAliveRaised.WaitOne(TimeSpan.FromSeconds(10)));
         }
 
         [Test]

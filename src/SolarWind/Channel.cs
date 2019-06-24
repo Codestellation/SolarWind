@@ -26,11 +26,17 @@ namespace Codestellation.SolarWind
         private readonly ILogger<Channel> _logger;
         private readonly Message[] _batch;
         private int _batchLength;
+        private long _lastReceived;
+        private long _lastSent;
 
         public HubId RemoteHubId { get; internal set; }
 
         internal ChannelId ChannelId { get; set; }
         internal Uri RemoteUri { get; set; }
+
+        public bool Connected => _connection != null && _connection.Connected;
+
+        public event Action<Channel> OnKeepAliveTimeout;
 
         public Channel(ChannelOptions options, ILoggerFactory factory)
         {
@@ -44,6 +50,10 @@ namespace Codestellation.SolarWind
             _batch = new Message[100];
             _logger = factory.CreateLogger<Channel>();
             _session = new Session(options.Serializer, OnIncomingMessage, factory.CreateLogger<Session>());
+            OnKeepAliveTimeout += channel => { };
+
+            _lastReceived = _lastSent = DateTime.Now.Ticks;
+            Task.Run(CheckKeepAlive).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         internal void OnReconnect(Connection connection)
@@ -119,6 +129,7 @@ namespace Codestellation.SolarWind
                     _logger.LogDebug($"Received {message.Header.ToString()}");
                 }
                 _session.EnqueueIncoming(message);
+                _lastReceived = DateTime.Now.Ticks;
             }
             //Note: do not handle other exception types. These would mean something went completely wrong and we'd better know it asap
             catch (IOException ex)
@@ -170,6 +181,7 @@ namespace Codestellation.SolarWind
                     Array.ForEach(_batch, m => m.Dispose());
                     Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
                     _batchLength = 0;
+                    _lastSent = DateTime.Now.Ticks;
                 }
                 //Note: do not handle other exception types. These would mean something went completely wrong and we'd better know it asap
                 catch (IOException ex)
@@ -234,6 +246,31 @@ namespace Codestellation.SolarWind
         {
             _logger.LogCritical(task.Exception, "Task failed:");
             Environment.FailFast($"Task failed: {task.Exception}", task.Exception);
+        }
+
+        private async void CheckKeepAlive()
+        {
+            if (_options.KeepAliveTimeout <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            while (_disposed != Disposed)
+            {
+                await Task.Delay(_options.KeepAliveTimeout).ConfigureAwait(false);
+
+                var current = DateTime.Now.Ticks;;
+                long timeoutTicks = _options.KeepAliveTimeout.Ticks;
+
+                var lastReceived = current - _lastReceived;
+                var lastSent = current - _lastSent;
+                if (_disposed != Disposed
+                    && timeoutTicks < lastReceived
+                    && timeoutTicks < lastSent)
+                {
+                    OnKeepAliveTimeout(this);
+                }
+            }
         }
 
         private void EnsureNotDisposed()
