@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -31,25 +32,38 @@ namespace Codestellation.SolarWind.Internals
 
         public async ValueTask ReceiveAsync(PooledMemoryStream readBuffer, int bytesToReceive, CancellationToken cancellation)
         {
-            var left = bytesToReceive;
-
-            while (left != 0)
+            try
             {
-                if (cancellation.IsCancellationRequested)
+                var left = bytesToReceive;
+                while (left != 0)
                 {
-                    throw new TaskCanceledException();
-                }
+                    if (cancellation.IsCancellationRequested)
+                    {
+                        throw new TaskCanceledException();
+                    }
 
-                left -= await readBuffer.WriteAsync(_mainStream, bytesToReceive, cancellation).ConfigureAwait(false);
+                    left -= await readBuffer.WriteAsync(_mainStream, bytesToReceive, cancellation).ConfigureAwait(false);
+                }
+            }
+            catch (ObjectDisposedException e)
+            {
+                throw new IOException("Reveive faild", e);
             }
         }
 
         public ValueTask WriteAsync(in Message message, CancellationToken cancellation)
         {
-            _logger.LogDebug($"Writing message {message.Header.ToString()}");
-            var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
-            WireHeader.WriteTo(wireHeader, _mainStream);
-            return message.Payload.CopyIntoAsync(_mainStream, cancellation);
+            try
+            {
+                _logger.LogDebug($"Writing message {message.Header.ToString()}");
+                var wireHeader = new WireHeader(message.Header, new PayloadSize((int)message.Payload.Length));
+                WireHeader.WriteTo(wireHeader, _mainStream);
+                return message.Payload.CopyIntoAsync(_mainStream, cancellation);
+            }
+            catch (ObjectDisposedException e)
+            {
+                throw new IOException("Reveive faild", e);
+            }
         }
 
         public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
