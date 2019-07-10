@@ -11,14 +11,16 @@ namespace Codestellation.SolarWind.Clients
     {
         private readonly Channel _channel;
         private readonly SolarWindClientOptions _options;
+        private readonly Action<object> _eventCallback;
         private readonly ConcurrentDictionary<MessageId, object> _requestRegistry;
         private Task _timeoutTask;
         private bool _disposed;
 
-        public SolarWindClient(Channel channel, SolarWindClientOptions options)
+        public SolarWindClient(Channel channel, SolarWindClientOptions options, Action<object> eventCallback)
         {
             _channel = channel ?? throw new ArgumentNullException(nameof(channel));
             _options = options ?? throw new ArgumentNullException(nameof(options));
+            _eventCallback = eventCallback ?? throw new ArgumentNullException(nameof(eventCallback));
             channel.SetCallback(OnSolarWindCallback);
             _requestRegistry = new ConcurrentDictionary<MessageId, object>();
 
@@ -67,6 +69,12 @@ namespace Codestellation.SolarWind.Clients
 
         private void OnSolarWindCallback(Channel channel, in MessageHeader header, object data)
         {
+            if (header.ReplyTo.IsEmpty)
+            {
+                InvokeCallback(data);
+                return;
+            }
+
             // It's possible that result will be available before task completion source was added to the registry
             // so put the result itself into the registry.
             object result = _requestRegistry.GetOrAdd(header.ReplyTo, data);
@@ -78,6 +86,8 @@ namespace Codestellation.SolarWind.Clients
                 source.SetGenericResult(data);
             }
         }
+
+        private void InvokeCallback(object data) => _eventCallback?.Invoke(data);
 
         public void Dispose() => _disposed = true;
     }
