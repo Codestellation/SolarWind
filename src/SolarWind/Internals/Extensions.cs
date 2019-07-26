@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
+using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -57,7 +58,7 @@ namespace Codestellation.SolarWind.Internals
         {
             using (var buffer = new PooledMemoryStream())
             {
-                await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(false);
+                await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(ContinueOn.IOScheduler);
 
 
                 buffer.Position = 0;
@@ -70,7 +71,7 @@ namespace Codestellation.SolarWind.Internals
                     throw new SolarWindException("Invalid wire header");
                 }
 
-                await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value).ConfigureAwait(false);
+                await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value).ConfigureAwait(ContinueOn.IOScheduler);
                 buffer.Position = 0;
                 return Protocol.HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
             }
@@ -84,7 +85,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 left -= await readBuffer
                     .WriteAsync(self, left, CancellationToken.None)
-                    .ConfigureAwait(false);
+                    .ConfigureAwait(ContinueOn.IOScheduler);
             } while (left != 0);
         }
     }

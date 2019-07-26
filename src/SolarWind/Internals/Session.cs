@@ -64,7 +64,7 @@ namespace Codestellation.SolarWind.Internals
 
                 if (batchLength == 0)
                 {
-                    await _serializationQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
+                    await _serializationQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(ContinueOn.IOScheduler);
                     continue;
                 }
 
@@ -113,7 +113,7 @@ namespace Codestellation.SolarWind.Internals
 
                 if (batchLength == 0)
                 {
-                    await _incomingQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
+                    await _incomingQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(ContinueOn.IOScheduler);
                     continue;
                 }
 

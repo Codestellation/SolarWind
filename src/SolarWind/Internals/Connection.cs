@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Protocol;
+using Codestellation.SolarWind.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind.Internals
@@ -42,7 +43,7 @@ namespace Codestellation.SolarWind.Internals
                         throw new TaskCanceledException();
                     }
 
-                    left -= await readBuffer.WriteAsync(_mainStream, bytesToReceive, cancellation).ConfigureAwait(false);
+                    left -= await readBuffer.WriteAsync(_mainStream, bytesToReceive, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 }
             }
             catch (ObjectDisposedException e)
