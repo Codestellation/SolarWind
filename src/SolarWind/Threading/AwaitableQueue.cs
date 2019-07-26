@@ -12,7 +12,7 @@ namespace Codestellation.SolarWind.Threading
     public class AwaitableQueue<T>
     {
         private readonly SimpleQueue<T> _queue;
-        private SemaphoreSlim _lock;
+        private readonly SemaphoreSlim _lock;
 
         public AwaitableQueue(ContinuationOptions options = ContinuationOptions.None)
         {

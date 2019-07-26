@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
+using Codestellation.SolarWind.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind
@@ -75,8 +76,16 @@ namespace Codestellation.SolarWind
             _cancellationSource = cancellation;
             _connection = connection;
 
-            Task.Run(() => StartReadingTask(cancellation.Token)).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
-            Task.Run(() => StartWritingTask(cancellation.Token)).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+            Task
+                .Factory
+                .StartNew(() => StartReadingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, IOTaskScheduler.Instance)
+                .ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+
+            Task
+                .Factory
+                .StartNew(() => StartWritingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, IOTaskScheduler.Instance)
+                .ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+
         }
 
         /// <summary>
