@@ -43,7 +43,7 @@ namespace Codestellation.SolarWind.Tests
             {
                 channel.Post(TextMessage.New());
 
-                _received.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)).Should().BeTrue(message);
+                _received.WaitHandle.WaitOne(TimeSpan.FromSeconds(20)).Should().BeTrue(message);
 
                 _received.Reset();
             }

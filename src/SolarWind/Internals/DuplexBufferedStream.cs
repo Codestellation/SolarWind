@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -67,7 +68,7 @@ namespace Codestellation.SolarWind.Internals
             _readLen = 0;
             var memory = new Memory<byte>(_readBuffer, 0, _readBuffer.Length);
             //TODO: Here's bug: in case of exception stream will be left in inconsistent state
-            _readLen = await _asyncStream.ReadAsync(memory, cancellation).ConfigureAwait(false);
+            _readLen = await _asyncStream.ReadAsync(memory, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
 
             if (_readLen == 0) //eof in the inner stream
             {
@@ -131,7 +132,7 @@ namespace Codestellation.SolarWind.Internals
 
                 if (_writePos == _writeBuffer.Length)
                 {
-                    await FlushAsync(cancellation).ConfigureAwait(false);
+                    await FlushAsync(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 }
             } while (left != 0);
         }
@@ -181,12 +182,12 @@ namespace Codestellation.SolarWind.Internals
 
             if (_asyncStream == null)
             {
-                await _inner.WriteAsync(_writeBuffer, 0, _writePos, cancellation).ConfigureAwait(false);
+                await _inner.WriteAsync(_writeBuffer, 0, _writePos, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
             }
             else
             {
                 var memory = new ReadOnlyMemory<byte>(_writeBuffer, 0, _writePos);
-                await _asyncStream.WriteAsync(memory, cancellation).ConfigureAwait(false);
+                await _asyncStream.WriteAsync(memory, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
             }
 
             _writePos = 0;

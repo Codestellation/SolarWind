@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
 using Codestellation.SolarWind.Protocol;
+using Codestellation.SolarWind.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Codestellation.SolarWind
@@ -75,8 +76,16 @@ namespace Codestellation.SolarWind
             _cancellationSource = cancellation;
             _connection = connection;
 
-            Task.Run(() => StartReadingTask(cancellation.Token)).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
-            Task.Run(() => StartWritingTask(cancellation.Token)).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+            Task
+                .Factory
+                .StartNew(() => StartReadingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, IOTaskScheduler.Instance)
+                .ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+
+            Task
+                .Factory
+                .StartNew(() => StartWritingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, IOTaskScheduler.Instance)
+                .ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+
         }
 
         /// <summary>
@@ -106,7 +115,7 @@ namespace Codestellation.SolarWind
             _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
             while (!cancellation.IsCancellationRequested)
             {
-                await Receive(cancellation).ConfigureAwait(false);
+                await Receive(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
             }
         }
 
@@ -115,12 +124,12 @@ namespace Codestellation.SolarWind
             var buffer = new PooledMemoryStream();
             try
             {
-                await _connection.ReceiveAsync(buffer, WireHeader.Size, token).ConfigureAwait(false);
+                await _connection.ReceiveAsync(buffer, WireHeader.Size, token).ConfigureAwait(ContinueOn.IOScheduler);
                 buffer.Position = 0;
                 WireHeader wireHeader = WireHeader.ReadFrom(buffer);
                 buffer.Reset();
 
-                await _connection.ReceiveAsync(buffer, wireHeader.PayloadSize.Value, token).ConfigureAwait(false);
+                await _connection.ReceiveAsync(buffer, wireHeader.PayloadSize.Value, token).ConfigureAwait(ContinueOn.IOScheduler);
                 buffer.Position = 0;
                 var message = new Message(wireHeader.MessageHeader, buffer);
 
@@ -172,7 +181,7 @@ namespace Codestellation.SolarWind
                            && _batchLength == 0 //Batch was not send due to exception. will try to resend it
                            && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
                     {
-                        await _session.AwaitOutgoing(cancellation).ConfigureAwait(false);
+                        await _session.AwaitOutgoing(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                     }
 
                     _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
@@ -205,12 +214,12 @@ namespace Codestellation.SolarWind
                 //_logger.LogDebug($"Writing message {message.Header.ToString()}");
                 await _connection
                     .WriteAsync(_batch[i], cancellation)
-                    .ConfigureAwait(false);
+                    .ConfigureAwait(ContinueOn.IOScheduler);
             }
 
             await _connection
                 .FlushAsync(cancellation)
-                .ConfigureAwait(false);
+                .ConfigureAwait(ContinueOn.IOScheduler);
         }
 
         //It's made internal to avoid occasional calls from user's code.

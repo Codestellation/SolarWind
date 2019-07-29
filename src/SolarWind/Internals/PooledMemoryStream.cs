@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -75,7 +76,7 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        //TODO: take into account request size in case of allocation buffers. 
+        //TODO: take into account request size in case of allocation buffers.
         private Memory<byte> GetWritableMemory(int requested)
         {
             if (_buffers.Count == 0)
@@ -156,7 +157,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 if (buffer.Length - start > 0)
                 {
-                    //So we found a buffer to read. 
+                    //So we found a buffer to read.
                     int bufferTail = buffer.Length - start;
                     int spanLength = Math.Min(bufferTail, maxToRead);
                     from = new ReadOnlySpan<byte>(buffer, start, spanLength);
@@ -241,7 +242,7 @@ namespace Codestellation.SolarWind.Internals
             do
             {
                 var memory = GetWritableMemory(left);
-                lastRead = await from.ReadAsync(memory, cancellation).ConfigureAwait(false);
+                lastRead = await from.ReadAsync(memory, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 left -= lastRead;
                 _position += lastRead;
             } while (left != 0 && lastRead > 0);
@@ -295,7 +296,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 int bytesToCopy = Math.Min(left, buffer.Length);
                 var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesToCopy);
-                await destination.WriteAsync(memory, cancellation).ConfigureAwait(false);
+                await destination.WriteAsync(memory, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 left -= bytesToCopy;
                 if (left == 0)
                 {
@@ -311,7 +312,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 int bytesToCopy = Math.Min(left, buffer.Length);
                 var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesToCopy);
-                await destination.WriteAsync(memory, cancellation).ConfigureAwait(false);
+                await destination.WriteAsync(memory, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 left -= bytesToCopy;
                 if (left == 0)
                 {

@@ -33,21 +33,25 @@ namespace Codestellation.SolarWind.Internals
             _callback = callback ?? throw new ArgumentNullException(nameof(callback));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages. 
+            //Use thread pool to avoid Enqueue caller thread to start serializing all incoming messages.
             _serializationQueue = new AwaitableQueue<(MessageId id, MessageId replyTo, object data)>(ContinuationOptions.ContinueAsync);
             _outgoingQueue = new AwaitableQueue<Message>(ContinuationOptions.ContinueAsync);
 
             _processedMessages = new PreemptiveHashSet<MessageId>(256 * 1024);
 
             //It's possible that poller thread will reach this queue and perform then continuation on the queue, and the following
-            // message processing as well and thus stop reading all the sockets. 
+            // message processing as well and thus stop reading all the sockets.
             _incomingQueue = new AwaitableQueue<Message>(ContinuationOptions.ContinueAsync);
             _disposal = new CancellationTokenSource();
 
             _currentMessageId = MessageId.Initialize();
 
-            Task.Run(StartSerializationTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
-            Task.Run(StartDeserializationTask).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
+            Task
+                .Factory
+                .StartNew(StartSerializationTask, CancellationToken.None, TaskCreationOptions.None, IOTaskScheduler.Instance);
+            Task
+                .Factory
+                .StartNew(StartDeserializationTask, CancellationToken.None, TaskCreationOptions.None, IOTaskScheduler.Instance);
         }
 
         private async Task StartSerializationTask()
@@ -60,7 +64,7 @@ namespace Codestellation.SolarWind.Internals
 
                 if (batchLength == 0)
                 {
-                    await _serializationQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
+                    await _serializationQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(ContinueOn.IOScheduler);
                     continue;
                 }
 
@@ -109,7 +113,7 @@ namespace Codestellation.SolarWind.Internals
 
                 if (batchLength == 0)
                 {
-                    await _incomingQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
+                    await _incomingQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(ContinueOn.IOScheduler);
                     continue;
                 }
 
