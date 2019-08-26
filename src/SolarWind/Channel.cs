@@ -30,12 +30,15 @@ namespace Codestellation.SolarWind
         private long _lastReceived;
         private long _lastSent;
 
+        private readonly SemaphoreSlim _readLock;
+        private readonly SemaphoreSlim _writeLock;
+
         public HubId RemoteHubId { get; internal set; }
 
         internal ChannelId ChannelId { get; set; }
         internal Uri RemoteUri { get; set; }
 
-        public bool Connected => _connection != null && _connection.Connected;
+        public bool Connected => _connection?.Connected ?? false;
 
         public event Action<Channel> OnKeepAliveTimeout;
 
@@ -54,6 +57,9 @@ namespace Codestellation.SolarWind
             OnKeepAliveTimeout += channel => { };
 
             _lastReceived = _lastSent = DateTime.Now.Ticks;
+            _readLock = new SemaphoreSlim(1,1);
+            _writeLock = new SemaphoreSlim(1,1);
+
             Task.Run(CheckKeepAlive).ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
         }
 
@@ -112,10 +118,23 @@ namespace Codestellation.SolarWind
 
         private async Task StartReadingTask(CancellationToken cancellation)
         {
-            _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
-            while (!cancellation.IsCancellationRequested)
+            bool lockTaken = false;
+            try
             {
-                await Receive(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
+                lockTaken = await _readLock.WaitAsync(Timeout.Infinite, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
+
+                _logger.LogInformation($"Starting receiving from {RemoteHubId.Id}");
+                while (!cancellation.IsCancellationRequested)
+                {
+                    await Receive(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
+                }
+            }
+            finally
+            {
+                if (lockTaken)
+                {
+                    _readLock.Release();
+                }
             }
         }
 
@@ -170,40 +189,56 @@ namespace Codestellation.SolarWind
 
         private async Task StartWritingTask(CancellationToken cancellation)
         {
-            _logger.LogInformation($"Starting writing to {RemoteHubId.Id}");
-
-            while (!cancellation.IsCancellationRequested)
+            bool lockTaken = false;
+            try
             {
-                try
-                {
-                    _logger.LogDebug($"Dequeuing batch to send to {RemoteHubId.ToString()}");
-                    while (!cancellation.IsCancellationRequested
-                           && _batchLength == 0 //Batch was not send due to exception. will try to resend it
-                           && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
-                    {
-                        await _session.AwaitOutgoing(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
-                    }
+                lockTaken = await _writeLock.WaitAsync(Timeout.Infinite, cancellation).ConfigureAwait(false);
 
-                    _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
-                    await TrySendBatch(cancellation).ConfigureAwait(false);
+                _logger.LogInformation($"Starting writing to {RemoteHubId.Id}");
 
-                    Array.ForEach(_batch, m => m.Dispose());
-                    Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
-                    _batchLength = 0;
-                    _lastSent = DateTime.Now.Ticks;
-                }
-                //Note: do not handle other exception types. These would mean something went completely wrong and we'd better know it asap
-                catch (IOException ex)
+                while (!cancellation.IsCancellationRequested)
                 {
-                    _logger.LogDebug(ex, "Send error");
-                    Stop(true);
-                    break;
+                    await TrySend(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 }
-                catch (OperationCanceledException)
+            }
+            finally
+            {
+                if (lockTaken)
                 {
-                    _logger.LogInformation("Send worker stopped");
-                    break;
+                    _writeLock.Release();
                 }
+            }
+        }
+
+        private async Task TrySend(CancellationToken cancellation)
+        {
+            try
+            {
+                _logger.LogDebug($"Dequeuing batch to send to {RemoteHubId.ToString()}");
+                while (!cancellation.IsCancellationRequested
+                       && _batchLength == 0 //Batch was not send due to exception. will try to resend it
+                       && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
+                {
+                    await _session.AwaitOutgoing(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
+                }
+
+                _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
+                await TrySendBatch(cancellation).ConfigureAwait(false);
+
+                Array.ForEach(_batch, m => m.Dispose());
+                Array.Clear(_batch, 0, _batch.Length); //Allow GC to collect streams
+                _batchLength = 0;
+                _lastSent = DateTime.Now.Ticks;
+            }
+            //Note: do not handle other exception types. These would mean something went completely wrong and we'd better know it asap
+            catch (IOException ex)
+            {
+                _logger.LogDebug(ex, "Send error");
+                Stop(true);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Send worker stopped");
             }
         }
 
