@@ -79,8 +79,6 @@ namespace Codestellation.SolarWind.Internals
             return transferred;
         }
 
-
-
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
             WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
 
@@ -92,18 +90,25 @@ namespace Codestellation.SolarWind.Internals
                 throw new InvalidOperationException("Non array base memory is supported for .net core 2.1+ only");
             }
 
-            int left = from.Length;
-            var sent = 0;
-            while (left != 0)
+            try
             {
-                int realOffset = segment.Offset + sent;
-
-                if (!TrySendSyncNonBlock(ref sent, in segment, realOffset))
+                int left = from.Length;
+                var sent = 0;
+                while (left != 0)
                 {
-                    sent += await SendAsync(segment, realOffset, left).ConfigureAwait(false);
-                }
+                    int realOffset = segment.Offset + sent;
 
-                left = from.Length - sent;
+                    if (!TrySendSyncNonBlock(ref sent, in segment, realOffset))
+                    {
+                        sent += await SendAsync(segment, realOffset, left).ConfigureAwait(false);
+                    }
+
+                    left = from.Length - sent;
+                }
+            }
+            catch (Exception ex) when (ex is SocketException || ex is ObjectDisposedException)
+            {
+                throw new IOException("Send failed", ex);
             }
         }
 
