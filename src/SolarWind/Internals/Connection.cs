@@ -48,7 +48,7 @@ namespace Codestellation.SolarWind.Internals
             }
             catch (ObjectDisposedException e)
             {
-                throw new IOException("Reveive faild", e);
+                throw new IOException("Receive failed", e);
             }
         }
 
@@ -63,7 +63,7 @@ namespace Codestellation.SolarWind.Internals
             }
             catch (ObjectDisposedException e)
             {
-                throw new IOException("Reveive faild", e);
+                throw new IOException("Receive failed", e);
             }
         }
 

@@ -238,6 +238,9 @@ namespace Codestellation.SolarWind
             }
             catch (OperationCanceledException)
             {
+                //Return buffers in case of work finished.
+                Array.ForEach(_batch, m => m.Dispose());
+                Array.Clear(_batch, 0, _batch.Length);
                 _logger.LogInformation("Send worker stopped");
             }
         }
