@@ -48,9 +48,7 @@ namespace Codestellation.SolarWind.Tests
         }
 
         private void RaiseTimeOutEvent(ChannelId channelid, Channel channel)
-        {
-            channel.OnKeepAliveTimeout += _ => _keepAliveRaised.Set();
-        }
+            => channel.OnKeepAliveTimeout += _ => _keepAliveRaised.Set();
 
         [TearDown]
         public void TearDown() => _hub.Dispose();

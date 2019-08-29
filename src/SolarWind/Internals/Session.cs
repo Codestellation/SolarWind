@@ -48,10 +48,10 @@ namespace Codestellation.SolarWind.Internals
 
             Task
                 .Factory
-                .StartNew(StartSerializationTask, CancellationToken.None, TaskCreationOptions.None, IOTaskScheduler.Instance);
+                .StartNew(StartSerializationTask, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
             Task
                 .Factory
-                .StartNew(StartDeserializationTask, CancellationToken.None, TaskCreationOptions.None, IOTaskScheduler.Instance);
+                .StartNew(StartDeserializationTask, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
         }
 
         private async Task StartSerializationTask()
@@ -64,7 +64,7 @@ namespace Codestellation.SolarWind.Internals
 
                 if (batchLength == 0)
                 {
-                    await _serializationQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(ContinueOn.IOScheduler);
+                    await _serializationQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
                     continue;
                 }
 
@@ -113,7 +113,7 @@ namespace Codestellation.SolarWind.Internals
 
                 if (batchLength == 0)
                 {
-                    await _incomingQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(ContinueOn.IOScheduler);
+                    await _incomingQueue.AwaitEnqueued(_disposal.Token).ConfigureAwait(false);
                     continue;
                 }
 
