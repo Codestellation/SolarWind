@@ -76,6 +76,14 @@ namespace Codestellation.SolarWind.Internals
             args.Completed -= HandleAsyncResult;
             args.UserToken = null;
             args.Dispose();
+
+            // Zero transferred bytes means connection has been closed at the counterpart side.
+            // See https://docs.microsoft.com/en-us/dotnet/api/system.net.sockets.socketasynceventargs.bytestransferred?view=netframework-4.7.2
+            if (transferred == 0)
+            {
+                throw BuildConnectionClosedException();
+            }
+
             return transferred;
         }
 
