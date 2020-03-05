@@ -20,7 +20,7 @@ namespace Codestellation.SolarWind.Internals
 
             var wireHeader = new WireHeader(header, PayloadSize.From(stream, WireHeader.Size));
             byte[] buffer = stream.GetBuffer();
-            WireHeader.WriteTo(in wireHeader, buffer);
+            WireHeader.WriteTo(in wireHeader, buffer, 0);
         }
 
         public static ValueTask SendHandshake(this AsyncNetworkStream networkStream, HubId hubId)
@@ -31,7 +31,7 @@ namespace Codestellation.SolarWind.Internals
             var payloadSize = Encoding.UTF8.GetBytes(hubId.Id, 0, hubId.Id.Length, buffer, WireHeader.Size);
             var msgHeader = new MessageHeader(MessageTypeId.Handshake, MessageId.Empty, MessageId.Empty);
             var outgoingHeader = new WireHeader(msgHeader, new PayloadSize(payloadSize));
-            WireHeader.WriteTo(in outgoingHeader, buffer);
+            WireHeader.WriteTo(in outgoingHeader, buffer, 0);
             var memory = new ReadOnlyMemory<byte>(buffer, 0, WireHeader.Size + payloadSize);
             return networkStream.WriteAsync(memory, CancellationToken.None);
         }

@@ -24,24 +24,15 @@ namespace Codestellation.SolarWind.Protocol
             PayloadSize = payloadSize;
         }
 
-        public static unsafe void WriteTo(in WireHeader wireHeader, byte[] buffer)
+        public static unsafe void WriteTo(in WireHeader wireHeader, byte[] buffer, int startIndex)
         {
             fixed (byte* p = buffer)
             {
-                *(WireHeader*)p = wireHeader;
+                *(WireHeader*)(p + startIndex) = wireHeader;
             }
         }
 
         public static unsafe void WriteTo(in WireHeader wireHeader, PooledMemoryStream buffer)
-        {
-            fixed (WireHeader* wh = &wireHeader)
-            {
-                var span = new Span<byte>(wh, Size);
-                buffer.Write(span);
-            }
-        }
-
-        public static unsafe void WriteTo(in WireHeader wireHeader, DuplexBufferedStream buffer)
         {
             fixed (WireHeader* wh = &wireHeader)
             {
