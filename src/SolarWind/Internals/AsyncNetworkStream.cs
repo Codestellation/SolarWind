@@ -61,20 +61,18 @@ namespace Codestellation.SolarWind.Internals
 
         private async Task<int> ReceiveAsync(ArraySegment<byte> segment)
         {
-
-            var source = new TaskCompletionSource<int>();
-            var args = new SocketAsyncEventArgs {UserToken = source};
+            var args = new CompletionSourceAsyncEventArgs();
             args.Completed += HandleAsyncResult;
             args.SetBuffer(segment.Array, segment.Offset, segment.Count);
 
             if (Socket.ReceiveAsync(args))
             {
-                return await source.Task.ConfigureAwait(false);
+                return await args.CompletionSource.Task.ConfigureAwait(false);
             }
 
+            //UnusedCompletionSources.Push(source);
             int transferred = args.BytesTransferred;
             args.Completed -= HandleAsyncResult;
-            args.UserToken = null;
             args.Dispose();
 
             // Zero transferred bytes means connection has been closed at the counterpart side.
@@ -122,19 +120,17 @@ namespace Codestellation.SolarWind.Internals
 
         private async Task<int> SendAsync(ArraySegment<byte> segment, int realOffset, int left)
         {
-            var source = new TaskCompletionSource<int>();
-            var args = new SocketAsyncEventArgs {UserToken = source};
+            var args = new CompletionSourceAsyncEventArgs();
             args.Completed += HandleAsyncResult;
 
             args.SetBuffer(segment.Array, realOffset, left);
 
             if (Socket.SendAsync(args))
             {
-                return await source.Task.ConfigureAwait(false);
+                return await args.CompletionSource.Task.ConfigureAwait(false);
             }
 
             args.Completed -= HandleAsyncResult;
-            args.UserToken = null;
             args.Dispose();
 
             //Operation has completed synchronously
@@ -168,10 +164,7 @@ namespace Codestellation.SolarWind.Internals
 
         private static void HandleAsyncResult(object sender, SocketAsyncEventArgs e)
         {
-            //Nullify it to prevent double usage during further callbacks
-            //TaskCompletionSource<int> copy = source;
-            //source = null;
-            var source = (TaskCompletionSource<int>)e.UserToken;
+            TaskCompletionSource<int> source = ((CompletionSourceAsyncEventArgs)e).CompletionSource;
 
             if (e.SocketError != SocketError.Success)
             {
@@ -188,7 +181,6 @@ namespace Codestellation.SolarWind.Internals
                 source.TrySetResult(e.BytesTransferred);
             }
 
-            e.UserToken = null;
             e.Completed -= HandleAsyncResult;
             e.Dispose();
         }
