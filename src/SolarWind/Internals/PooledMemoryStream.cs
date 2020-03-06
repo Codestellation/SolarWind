@@ -229,7 +229,7 @@ namespace Codestellation.SolarWind.Internals
             return count - left;
         }
         
-        public async ValueTask<int> WriteAsync(Stream from, int count, CancellationToken cancellation)
+        public async ValueTask<int> WriteAsync(AsyncNetworkStream from, int count, CancellationToken cancellation)
         {
             if (count == 0)
             {
@@ -243,7 +243,8 @@ namespace Codestellation.SolarWind.Internals
             {
                 MemoryMarshal.TryGetArray(GetWritableMemory(left), out ArraySegment<byte> segment);
                 int bytesToRead = Math.Min(count, segment.Count);
-                lastRead = await from.ReadAsync(segment.Array, segment.Offset, bytesToRead, cancellation).ConfigureAwait(false);
+                var memory = new Memory<byte>(segment.Array, segment.Offset, bytesToRead);
+                lastRead = await from.ReadAsync(memory, cancellation).ConfigureAwait(false);
                 left -= lastRead;
                 _position += lastRead;
             } while (left != 0 && lastRead > 0);
@@ -254,43 +255,6 @@ namespace Codestellation.SolarWind.Internals
             }
 
             return count - left;
-        }
-
-        public ValueTask CopyIntoAsync(Stream destination, CancellationToken cancellation)
-        {
-            CopyInto(destination);
-            return new ValueTask(Task.CompletedTask);
-        }
-
-        public async ValueTask CopyIntoAsync(AsyncNetworkStream destination, CancellationToken cancellation)
-        {
-            var left = (int)_length;
-            foreach (byte[] buffer in _buffers)
-            {
-                int bytesToCopy = Math.Min(left, buffer.Length);
-                var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesToCopy);
-                await destination.WriteAsync(memory, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
-                left -= bytesToCopy;
-                if (left == 0)
-                {
-                    break;
-                }
-            }
-        }
-        
-        public void CopyInto(Stream destination)
-        {
-            var left = (int)_length;
-            foreach (byte[] buffer in _buffers)
-            {
-                int bytesToCopy = Math.Min(left, buffer.Length);
-                destination.Write(buffer, 0, bytesToCopy);
-                left -= bytesToCopy;
-                if (left == 0)
-                {
-                    break;
-                }
-            }
         }
     }
 }

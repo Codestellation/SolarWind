@@ -1,27 +1,38 @@
 using System;
 using System.Net.Sockets;
-using System.Threading;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Sources;
+using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind.Internals
 {
-    internal class CompletionSourceAsyncEventArgs : SocketAsyncEventArgs
+    internal class CompletionSourceAsyncEventArgs : SocketAsyncEventArgs, IValueTaskSource
     {
-        private TaskCompletionSource<int> _source;
+        private SyncValueTaskSourceCore _valueSource = new SyncValueTaskSourceCore();
 
-        public TaskCompletionSource<int> CompletionSource
+        public ValueTask Task
         {
-            get
-            {
-                if (_source != null)
-                {
-                    return _source;
-                }
-                // Here's possible multiple creation of TaskCompletionSource, but it's unlikely to happen;
-                // However it allows thread-safe assigning without locking. 
-                Interlocked.CompareExchange(ref _source, new TaskCompletionSource<int>(), null);
-                return _source;
-            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => new ValueTask(this, _valueSource.Version);
         }
+
+        public void Reset()
+            => _valueSource.Reset();
+
+        public void SetException(Exception exception)
+            => _valueSource.SetException(exception);
+
+        public void SetResult()
+            => _valueSource.SetResult();
+
+        public ValueTaskSourceStatus GetStatus(short token)
+            => _valueSource.GetStatus(token);
+
+        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
+            => _valueSource.OnCompleted(continuation, state, token, flags);
+
+        public void GetResult(short token)
+            => _valueSource.GetResult(token);
     }
 }

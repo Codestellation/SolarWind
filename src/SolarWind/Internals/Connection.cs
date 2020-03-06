@@ -55,8 +55,9 @@ namespace Codestellation.SolarWind.Internals
                     {
                         _readPosition = 0;
                         _readLength = 0;
+                        var memory = new Memory<byte>(_readBuffer, 0, _readBuffer.Length);
                         _readLength = await _networkStream
-                            .ReadAsync(_readBuffer, 0, _readBuffer.Length, cancellation)
+                            .ReadAsync(memory, cancellation)
                             .ConfigureAwait(false);
                         available = _readLength;
                     }
@@ -106,7 +107,7 @@ namespace Codestellation.SolarWind.Internals
                     var readFromPayload = payload.Read(_writeBuffer, _writePosition, sliceSize);
 
                     Debug.Assert(sliceSize == readFromPayload);
-                    
+
                     bytesToSend -= readFromPayload;
                     _writePosition += readFromPayload;
                 }
@@ -228,11 +229,12 @@ namespace Codestellation.SolarWind.Internals
             socket.LingerState = new LingerOption(true, 1);
         }
 
-        public Task FlushAsync(CancellationToken cancellation)
+        public ValueTask FlushAsync(CancellationToken cancellation)
         {
             var length = _writePosition;
             _writePosition = 0; //Zero it here to avoid making the method async
-            return _networkStream.WriteAsync(_writeBuffer, 0, length, cancellation);
+            var memory = new ReadOnlyMemory<byte>(_writeBuffer, 0, length);
+            return _networkStream.WriteAsync(memory, cancellation);
         }
 
         public void Dispose()

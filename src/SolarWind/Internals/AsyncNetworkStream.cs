@@ -18,8 +18,11 @@ namespace Codestellation.SolarWind.Internals
         }
 
 #if NETSTANDARD2_0
+        //protected override void Dispose(bool disposing) => Socket.SafeDispose();
+
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellation)
-            => ReadAsync(new Memory<byte>(buffer, offset, count), cancellation).AsTask();
+            //ReadAsync(new Memory<byte>(buffer, offset, count), cancellation).AsTask();
+            => throw new NotSupportedException();
 
         //See comments at the top
 
@@ -29,14 +32,15 @@ namespace Codestellation.SolarWind.Internals
             {
                 throw new InvalidOperationException("Non array base memory is supported for .net core 2.1+ only");
             }
+
             try
             {
-                if (TryReceiveSyncNonBlock(segment, out int received))
+                if (!TryReceiveSyncNonBlock(segment, out int received))
                 {
-                    return received;
+                    received = await ReceiveAsync(segment).ConfigureAwait(false);
                 }
 
-                return await ReceiveAsync(segment).ConfigureAwait(false);
+                return received;
             }
             catch (Exception ex) when (ex is SocketException || ex is ObjectDisposedException)
             {
@@ -46,34 +50,32 @@ namespace Codestellation.SolarWind.Internals
 
         private bool TryReceiveSyncNonBlock(in ArraySegment<byte> segment, out int received)
         {
-
-            if (Socket.Available == 0)
+            int available = Socket.Available;
+            if (available == 0)
             {
                 received = 0;
                 return false;
             }
 
-            int bytesToRead = Math.Min(segment.Count, Socket.Available);
+            int bytesToRead = Math.Min(segment.Count, available);
             received = Socket.Receive(segment.Array, segment.Offset, bytesToRead, SocketFlags.None);
             return true;
-
         }
 
-        private async Task<int> ReceiveAsync(ArraySegment<byte> segment)
+        private async ValueTask<int> ReceiveAsync(ArraySegment<byte> segment)
         {
-            var args = new CompletionSourceAsyncEventArgs();
-            args.Completed += HandleAsyncResult;
-            args.SetBuffer(segment.Array, segment.Offset, segment.Count);
+            CompletionSourceAsyncEventArgs receiveArgs = SocketEventArgsPool.Instance.Get();
+            receiveArgs.SetBuffer(segment.Array, segment.Offset, segment.Count);
 
-            if (Socket.ReceiveAsync(args))
+            if (Socket.ReceiveAsync(receiveArgs))
             {
-                return await args.CompletionSource.Task.ConfigureAwait(false);
+                await receiveArgs.Task.ConfigureAwait(false);
             }
 
-            //UnusedCompletionSources.Push(source);
-            int transferred = args.BytesTransferred;
-            args.Completed -= HandleAsyncResult;
-            args.Dispose();
+            int transferred = receiveArgs.BytesTransferred;
+
+            SocketEventArgsPool.Instance.Return(receiveArgs);
+
 
             // Zero transferred bytes means connection has been closed at the counterpart side.
             // See https://docs.microsoft.com/en-us/dotnet/api/system.net.sockets.socketasynceventargs.bytestransferred?view=netframework-4.7.2
@@ -85,8 +87,10 @@ namespace Codestellation.SolarWind.Internals
             return transferred;
         }
 
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-            WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            //WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
+            => throw new NotSupportedException();
+
 
         //See comments at the top
         public async ValueTask WriteAsync(ReadOnlyMemory<byte> from, CancellationToken cancellationToken)
@@ -118,28 +122,28 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        private async Task<int> SendAsync(ArraySegment<byte> segment, int realOffset, int left)
+        private async ValueTask<int> SendAsync(ArraySegment<byte> segment, int realOffset, int left)
         {
-            var args = new CompletionSourceAsyncEventArgs();
-            args.Completed += HandleAsyncResult;
+            CompletionSourceAsyncEventArgs sendArgs = SocketEventArgsPool.Instance.Get();
+            sendArgs.SetBuffer(segment.Array, realOffset, left);
 
-            args.SetBuffer(segment.Array, realOffset, left);
-
-            if (Socket.SendAsync(args))
+            if (Socket.SendAsync(sendArgs))
             {
-                return await args.CompletionSource.Task.ConfigureAwait(false);
+                await sendArgs.Task.ConfigureAwait(false);
             }
-
-            args.Completed -= HandleAsyncResult;
-            args.Dispose();
 
             //Operation has completed synchronously
-            if (args.SocketError == SocketError.Success)
+            int bytesTransferred = sendArgs.BytesTransferred;
+            SocketError socketError = sendArgs.SocketError;
+
+            SocketEventArgsPool.Instance.Return(sendArgs);
+
+            if (socketError == SocketError.Success)
             {
-                return args.BytesTransferred;
+                return bytesTransferred;
             }
 
-            throw BuildIoException(args.SocketError);
+            throw BuildIoException(socketError);
         }
 
         private bool TrySendSyncNonBlock(ref int sent, in ArraySegment<byte> segment, int realOffset)
@@ -154,37 +158,32 @@ namespace Codestellation.SolarWind.Internals
                 sent += Socket.Send(segment.Array, realOffset, segment.Count, SocketFlags.None);
                 return true;
             }
-            catch (Exception ex) when(ex is SocketException || ex is ObjectDisposedException)
+            catch (Exception ex) when (ex is SocketException || ex is ObjectDisposedException)
             {
                 throw new IOException("Send failed", ex);
             }
         }
 
-#endif
-
-        private static void HandleAsyncResult(object sender, SocketAsyncEventArgs e)
+        internal static void HandleAsyncResult(object sender, SocketAsyncEventArgs e)
         {
-            TaskCompletionSource<int> source = ((CompletionSourceAsyncEventArgs)e).CompletionSource;
+            var args = (CompletionSourceAsyncEventArgs)e;
 
-            if (e.SocketError != SocketError.Success)
+            if (args.SocketError != SocketError.Success)
             {
-                source.TrySetException(BuildIoException(e.SocketError));
+                args.SetException(BuildIoException(args.SocketError));
             }
-            else if (e.BytesTransferred == 0)
+            else if (args.BytesTransferred == 0)
             {
                 // Zero transferred bytes means connection has been closed at the counterpart side.
                 // See https://docs.microsoft.com/en-us/dotnet/api/system.net.sockets.socketasynceventargs.bytestransferred?view=netframework-4.7.2
-                source.TrySetException(BuildConnectionClosedException());
+                args.SetException(BuildConnectionClosedException());
             }
             else
             {
-                source.TrySetResult(e.BytesTransferred);
+                args.SetResult();
             }
-
-            e.Completed -= HandleAsyncResult;
-            e.Dispose();
         }
-
+#endif
         private static IOException BuildConnectionClosedException() => BuildIoException(SocketError.SocketError, "The counterpart has closed the connection");
 
         private static IOException BuildIoException(SocketError socketError, string message = "Send or receive failed")

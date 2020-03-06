@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +14,8 @@ namespace Codestellation.SolarWind.Threading
 
         private readonly ObjectPool<WorkItem> _workItemsPool;
 
-        private IOTaskScheduler() => _workItemsPool = new DefaultObjectPool<WorkItem>(new WorkItemPolicy(this));
+        private IOTaskScheduler()
+            => _workItemsPool = new DefaultObjectPool<WorkItem>(new WorkItemPolicy(this));
 
         protected override void QueueTask(Task task)
         {
@@ -23,9 +24,11 @@ namespace Codestellation.SolarWind.Threading
             ThreadPool.UnsafeQueueNativeOverlapped(wi.PNOlap);
         }
 
-        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => TryExecuteTask(task);
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
+            => TryExecuteTask(task);
 
-        protected override IEnumerable<Task> GetScheduledTasks() => Enumerable.Empty<Task>();
+        protected override IEnumerable<Task> GetScheduledTasks()
+            => Enumerable.Empty<Task>();
 
         private class WorkItem
         {
