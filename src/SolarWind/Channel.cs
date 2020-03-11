@@ -214,7 +214,11 @@ namespace Codestellation.SolarWind
         {
             try
             {
-                _logger.LogDebug($"Dequeuing batch to send to {RemoteHubId.ToString()}");
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug($"Dequeuing batch to send to {RemoteHubId.ToString()}");
+                }
+
                 while (!cancellation.IsCancellationRequested
                        && _batchLength == 0 //Batch was not send due to exception. will try to resend it
                        && (_batchLength = _session.TryDequeueBatch(_batch)) == 0)
@@ -222,7 +226,12 @@ namespace Codestellation.SolarWind
                     await _session.AwaitOutgoing(cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 }
 
-                _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug($"Dequeued {_batchLength} messages to {RemoteHubId.ToString()}");
+                }
+
+
                 await TrySendBatch(cancellation).ConfigureAwait(false);
 
                 Array.ForEach(_batch, m => m.Dispose());

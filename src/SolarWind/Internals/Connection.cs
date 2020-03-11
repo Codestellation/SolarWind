@@ -78,7 +78,10 @@ namespace Codestellation.SolarWind.Internals
         {
             try
             {
-                _logger.LogDebug($"Writing message {message.Header.ToString()}");
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug($"Writing message {message.Header.ToString()}");
+                }
 
                 var available = _writeBuffer.Length - _writePosition;
                 PooledMemoryStream payload = message.Payload;
