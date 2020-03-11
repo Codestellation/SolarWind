@@ -1,11 +1,12 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26430.14
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29827.131
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolarWind", "SolarWind\SolarWind.csproj", "{B4926219-9D54-461B-853E-3D4570276B1A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SolarWind", "SolarWind\SolarWind.csproj", "{B4926219-9D54-461B-853E-3D4570276B1A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolarWind.Tests", "SolarWind.Tests\SolarWind.Tests.csproj", "{935C906E-97D6-45F7-A7C6-ADC71DEE7529}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SolarWind.Tests", "SolarWind.Tests\SolarWind.Tests.csproj", "{935C906E-97D6-45F7-A7C6-ADC71DEE7529}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Benchmark", "Benchmark\Benchmark.csproj", "{27700D58-5A34-4CA5-AD89-50A53C854767}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,8 +22,15 @@ Global
 		{935C906E-97D6-45F7-A7C6-ADC71DEE7529}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{935C906E-97D6-45F7-A7C6-ADC71DEE7529}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{935C906E-97D6-45F7-A7C6-ADC71DEE7529}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27700D58-5A34-4CA5-AD89-50A53C854767}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27700D58-5A34-4CA5-AD89-50A53C854767}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27700D58-5A34-4CA5-AD89-50A53C854767}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27700D58-5A34-4CA5-AD89-50A53C854767}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {85C426E8-1A18-4011-A742-CF3728AF6B41}
 	EndGlobalSection
 EndGlobal

@@ -6,6 +6,7 @@
     <IsPackable>false</IsPackable>
     <NoWarn>7035</NoWarn>
     <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="fluentassertions" Version="5.3.0" />
