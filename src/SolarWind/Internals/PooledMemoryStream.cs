@@ -5,7 +5,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Codestellation.SolarWind.Threading;
 
 namespace Codestellation.SolarWind.Internals
 {
@@ -16,7 +15,7 @@ namespace Codestellation.SolarWind.Internals
 
         private long _length;
         private long _position;
-        private readonly LinkedList<byte[]> _buffers;
+        private readonly List<byte[]> _buffers;
 
         public override bool CanRead { get; } = true;
 
@@ -40,7 +39,7 @@ namespace Codestellation.SolarWind.Internals
 
         public PooledMemoryStream()
         {
-            _buffers = new LinkedList<byte[]>();
+            _buffers = new List<byte[]>();
         }
 
         public override void Flush()
@@ -55,12 +54,12 @@ namespace Codestellation.SolarWind.Internals
 
         public void Write(ReadOnlySpan<byte> from)
         {
-            int left = from.Length;
+            var left = from.Length;
             var start = 0;
             while (left != 0)
             {
                 Memory<byte> memory = GetWritableMemory(left);
-                int length = Math.Min(left, memory.Length);
+                var length = Math.Min(left, memory.Length);
                 from
                     .Slice(start, length)
                     .CopyTo(memory.Span);
@@ -88,10 +87,10 @@ namespace Codestellation.SolarWind.Internals
 
             foreach (byte[] buffer in _buffers)
             {
-                int tailLength = buffer.Length - start;
+                var tailLength = buffer.Length - start;
                 if (tailLength > 0)
                 {
-                    int length = Math.Min(requested, tailLength);
+                    var length = Math.Min(requested, tailLength);
                     return new Memory<byte>(buffer, start, length);
                 }
 
@@ -104,8 +103,8 @@ namespace Codestellation.SolarWind.Internals
         private Memory<byte> RentNew(int requested)
         {
             byte[] buffer = ArrayPool<byte>.Shared.Rent(BytesToRent);
-            _buffers.AddLast(buffer);
-            int length = Math.Min(requested, buffer.Length);
+            _buffers.Add(buffer);
+            var length = Math.Min(requested, buffer.Length);
             return new Memory<byte>(buffer, 0, length);
         }
 
@@ -129,7 +128,7 @@ namespace Codestellation.SolarWind.Internals
                 return 0;
             }
 
-            int left = to.Length;
+            var left = to.Length;
             Span<byte> currentTo = to;
             while (left != 0 && TryGetReadableSpan(left, out ReadOnlySpan<byte> from))
             {
@@ -151,15 +150,15 @@ namespace Codestellation.SolarWind.Internals
 
             var start = (int)_position;
             var totalNotRead = (int)(_length - _position);
-            int maxToRead = Math.Min(totalNotRead, requested);
+            var maxToRead = Math.Min(totalNotRead, requested);
 
             foreach (byte[] buffer in _buffers)
             {
                 if (buffer.Length - start > 0)
                 {
                     //So we found a buffer to read.
-                    int bufferTail = buffer.Length - start;
-                    int spanLength = Math.Min(bufferTail, maxToRead);
+                    var bufferTail = buffer.Length - start;
+                    var spanLength = Math.Min(bufferTail, maxToRead);
                     from = new ReadOnlySpan<byte>(buffer, start, spanLength);
 
                     _position += from.Length;
@@ -210,12 +209,12 @@ namespace Codestellation.SolarWind.Internals
             }
 
             var lastRead = 0;
-            int left = count;
+            var left = count;
 
             do
             {
                 MemoryMarshal.TryGetArray(GetWritableMemory(left), out ArraySegment<byte> segment);
-                int bytesToRead = Math.Min(count, segment.Count);
+                var bytesToRead = Math.Min(count, segment.Count);
                 lastRead = from.Read(segment.Array, segment.Offset, bytesToRead);
                 left -= lastRead;
                 _position += lastRead;
@@ -228,7 +227,7 @@ namespace Codestellation.SolarWind.Internals
 
             return count - left;
         }
-        
+
         public async ValueTask<int> WriteAsync(AsyncNetworkStream from, int count, CancellationToken cancellation)
         {
             if (count == 0)
@@ -237,12 +236,12 @@ namespace Codestellation.SolarWind.Internals
             }
 
             var lastRead = 0;
-            int left = count;
+            var left = count;
 
             do
             {
                 MemoryMarshal.TryGetArray(GetWritableMemory(left), out ArraySegment<byte> segment);
-                int bytesToRead = Math.Min(count, segment.Count);
+                var bytesToRead = Math.Min(count, segment.Count);
                 var memory = new Memory<byte>(segment.Array, segment.Offset, bytesToRead);
                 lastRead = await from.ReadAsync(memory, cancellation).ConfigureAwait(false);
                 left -= lastRead;
