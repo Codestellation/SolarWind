@@ -31,10 +31,14 @@ namespace Codestellation.SolarWind.Internals
             set => _position = value;
         }
 
-        public void Reset()
+        public void Reset(bool returnBuffers = false)
         {
             _length = 0;
             _position = 0;
+            if (returnBuffers)
+            {
+                ReturnBuffers();
+            }
         }
 
         public PooledMemoryStream()

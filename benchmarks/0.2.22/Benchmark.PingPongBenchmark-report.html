@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Benchmark.PingPongBenchmark-20200510-171453</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18363
+AMD Ryzen 7 3700X, 1 CPU, 16 logical and 8 physical cores
+  [Host]     : .NET Framework 4.8 (4.8.4150.0), X64 RyuJIT
+  Job-PXRZLC : .NET Framework 4.8 (4.8.4150.0), X64 RyuJIT
+  Job-OOBLRO : .NET Core 2.1.16 (CoreCLR 4.6.28516.03, CoreFX 4.6.28516.10), X64 RyuJIT
+  Job-XEIULX : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
+</code></pre>
+<pre><code>InvocationCount=1  UnrollFactor=1  
+</code></pre>
+
+<table>
+<thead><tr><th>           Method</th><th>Runtime</th><th>MessageSize</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Median</th><th>Gen 0</th><th>Gen 1</th><th>Gen 2</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>Run_ping_pong_benchmark</td><td>.NET 4.7.2</td><td>64</td><td>647.1 ms</td><td>38.88 ms</td><td>114.64 ms</td><td>589.4 ms</td><td>25000.0000</td><td>7000.0000</td><td>2000.0000</td><td>62163888 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 2.1</td><td>64</td><td>406.9 ms</td><td>12.05 ms</td><td>31.95 ms</td><td>404.0 ms</td><td>6000.0000</td><td>1000.0000</td><td>-</td><td>-</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 3.1</td><td>64</td><td>399.5 ms</td><td>8.50 ms</td><td>24.53 ms</td><td>402.3 ms</td><td>3000.0000</td><td>1000.0000</td><td>-</td><td>26687064 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET 4.7.2</td><td>128</td><td>582.5 ms</td><td>11.66 ms</td><td>34.20 ms</td><td>582.8 ms</td><td>31000.0000</td><td>6000.0000</td><td>1000.0000</td><td>71485312 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 2.1</td><td>128</td><td>416.1 ms</td><td>8.29 ms</td><td>23.52 ms</td><td>413.9 ms</td><td>11000.0000</td><td>2000.0000</td><td>-</td><td>-</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 3.1</td><td>128</td><td>414.4 ms</td><td>8.84 ms</td><td>26.06 ms</td><td>412.1 ms</td><td>3000.0000</td><td>1000.0000</td><td>-</td><td>27439904 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET 4.7.2</td><td>256</td><td>684.3 ms</td><td>17.28 ms</td><td>49.01 ms</td><td>689.3 ms</td><td>27000.0000</td><td>5000.0000</td><td>-</td><td>80072472 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 2.1</td><td>256</td><td>534.3 ms</td><td>20.04 ms</td><td>59.09 ms</td><td>525.5 ms</td><td>11000.0000</td><td>3000.0000</td><td>-</td><td>-</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 3.1</td><td>256</td><td>593.2 ms</td><td>21.04 ms</td><td>62.05 ms</td><td>603.2 ms</td><td>10000.0000</td><td>4000.0000</td><td>1000.0000</td><td>81047504 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET 4.7.2</td><td>512</td><td>946.3 ms</td><td>18.50 ms</td><td>30.39 ms</td><td>940.4 ms</td><td>59000.0000</td><td>11000.0000</td><td>1000.0000</td><td>222448264 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 2.1</td><td>512</td><td>856.0 ms</td><td>16.91 ms</td><td>36.75 ms</td><td>857.3 ms</td><td>38000.0000</td><td>11000.0000</td><td>1000.0000</td><td>-</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 3.1</td><td>512</td><td>856.9 ms</td><td>17.05 ms</td><td>44.62 ms</td><td>868.7 ms</td><td>22000.0000</td><td>9000.0000</td><td>1000.0000</td><td>179573312 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET 4.7.2</td><td>1024</td><td>1,358.9 ms</td><td>26.43 ms</td><td>41.15 ms</td><td>1,371.0 ms</td><td>90000.0000</td><td>26000.0000</td><td>1000.0000</td><td>376211992 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 2.1</td><td>1024</td><td>1,190.5 ms</td><td>23.26 ms</td><td>30.25 ms</td><td>1,188.1 ms</td><td>72000.0000</td><td>21000.0000</td><td>1000.0000</td><td>-</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 3.1</td><td>1024</td><td>1,227.8 ms</td><td>24.22 ms</td><td>33.95 ms</td><td>1,219.8 ms</td><td>40000.0000</td><td>18000.0000</td><td>1000.0000</td><td>312638512 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET 4.7.2</td><td>2048</td><td>2,936.8 ms</td><td>75.17 ms</td><td>215.67 ms</td><td>2,876.0 ms</td><td>173000.0000</td><td>68000.0000</td><td>9000.0000</td><td>962726992 B</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 2.1</td><td>2048</td><td>2,172.1 ms</td><td>40.60 ms</td><td>39.88 ms</td><td>2,176.7 ms</td><td>133000.0000</td><td>39000.0000</td><td>5000.0000</td><td>-</td>
+</tr><tr><td>Run_ping_pong_benchmark</td><td>.NET Core 3.1</td><td>2048</td><td>2,105.9 ms</td><td>42.12 ms</td><td>59.04 ms</td><td>2,104.1 ms</td><td>71000.0000</td><td>34000.0000</td><td>4000.0000</td><td>516537104 B</td>
+</tr></tbody></table>
+</body>
+</html>

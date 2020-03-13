@@ -91,7 +91,6 @@ namespace Codestellation.SolarWind
                 .Factory
                 .StartNew(() => StartWritingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, IOTaskScheduler.Instance)
                 .ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
-
         }
 
         /// <summary>
@@ -140,7 +139,7 @@ namespace Codestellation.SolarWind
 
         private async ValueTask Receive(CancellationToken token)
         {
-            var buffer = new PooledMemoryStream();
+            PooledMemoryStream buffer = MemoryStreamPool.Instance.Get();
             try
             {
                 await _connection.ReceiveAsync(buffer, WireHeader.Size, token).ConfigureAwait(ContinueOn.IOScheduler);
@@ -162,13 +161,13 @@ namespace Codestellation.SolarWind
             //Note: do not handle other exception types. These would mean something went completely wrong and we'd better know it asap
             catch (IOException ex)
             {
-                buffer.Dispose();
+                MemoryStreamPool.Instance.Return(buffer);
                 _logger.LogInformation(ex, "Receive Error.");
                 Stop(true);
             }
             catch (OperationCanceledException)
             {
-                buffer.Dispose();
+                MemoryStreamPool.Instance.Return(buffer);
             }
         }
 

@@ -56,7 +56,8 @@ namespace Codestellation.SolarWind.Internals
 
         private static async Task<HandshakeMessage> HandshakeMessage(this AsyncNetworkStream self)
         {
-            using (var buffer = new PooledMemoryStream())
+            PooledMemoryStream buffer = MemoryStreamPool.Instance.Get();
+            try
             {
                 await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(ContinueOn.IOScheduler);
 
@@ -74,6 +75,10 @@ namespace Codestellation.SolarWind.Internals
                 await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value).ConfigureAwait(ContinueOn.IOScheduler);
                 buffer.Position = 0;
                 return Protocol.HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
+            }
+            finally
+            {
+                MemoryStreamPool.Instance.Return(buffer);
             }
         }
 

@@ -70,7 +70,7 @@ namespace Codestellation.SolarWind.Internals
 
                 for (var i = 0; i < batchLength; i++)
                 {
-                    var payload = new PooledMemoryStream();
+                    PooledMemoryStream payload = MemoryStreamPool.Instance.Get();
                     try
                     {
                         (MessageId id, MessageId replyTo, object data) = batch[i];
@@ -82,13 +82,13 @@ namespace Codestellation.SolarWind.Internals
                     }
                     catch (OperationCanceledException)
                     {
-                        payload.Dispose();
+                        MemoryStreamPool.Instance.Return(payload);
                         break;
                     }
                     catch (Exception ex)
                     {
                         //TODO: Put a message into incoming queue to notify about serialization failure
-                        payload.Dispose();
+                        MemoryStreamPool.Instance.Return(payload);
                         if (_logger.IsEnabled(LogLevel.Error))
                         {
                             _logger.LogError(ex, "Serialization failure.");
