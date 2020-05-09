@@ -51,20 +51,31 @@ namespace Benchmark.Commands.Compare
             output.AppendLine($" {GetDiffString(Allocated, baseline.Allocated)} |");
         }
 
-        private string GetDiffString(TimeSpan current, TimeSpan baseline) => $"{GetValue(current)} ({GetDiff(current, baseline)}%)";
+        private string GetDiffString(TimeSpan current, TimeSpan baseline)
+        {
+            double diff = GetDiff(current, baseline);
+            string color = GetColor(diff);
 
-        private string GetDiffString(decimal current, decimal baseline) => $"{current:N0} ({GetDiff(current, baseline)}%)";
+            return $"{color} {GetValue(current)} ({diff:N2}%)";
+        }
 
-        private string GetDiff(decimal current, decimal baseline)
+        private string GetDiffString(decimal current, decimal baseline)
         {
             if (baseline == 0)
             {
                 return "-";
             }
+            double diff = GetDiff(current, baseline);
+            string color = GetColor(diff);
+            return $"{color} {current:N0} ({diff:N2}%)";
+        }
+
+        private double GetDiff(decimal current, decimal baseline)
+        {
 
             decimal diff = current - baseline;
             decimal percent = diff / baseline * 100;
-            return percent.ToString("N2");
+            return (double) percent;
         }
 
         private string GetValue(TimeSpan value)
@@ -77,13 +88,21 @@ namespace Benchmark.Commands.Compare
             return $"{value.TotalMilliseconds:N3} ms";
         }
 
-        public string GetDiff(TimeSpan current, TimeSpan baseline)
+        private double GetDiff(TimeSpan current, TimeSpan baseline)
         {
             TimeSpan diff = current - baseline;
 
             double percent = diff.TotalMilliseconds / baseline.TotalMilliseconds * 100;
 
-            return percent.ToString("N2");
+            return percent;
+        }
+
+        private static string GetColor(double diff)
+        {
+            string color = diff < 0
+                ? "![#c5f015](https://via.placeholder.com/15/c5f015/000000?text=+)"
+                : "![#f03c15](https://via.placeholder.com/15/f03c15/000000?text=+)";
+            return color;
         }
     }
 }
