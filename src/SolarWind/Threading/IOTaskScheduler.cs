@@ -10,7 +10,9 @@ namespace Codestellation.SolarWind.Threading
 {
     public sealed unsafe class IOTaskScheduler : TaskScheduler
     {
-        public static readonly IOTaskScheduler Instance = new IOTaskScheduler();
+        private static IOTaskScheduler _instance;
+
+        public static IOTaskScheduler Instance => _instance ??= new IOTaskScheduler();
 
         private readonly ObjectPool<WorkItem> _workItemsPool;
 

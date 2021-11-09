@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Codestellation.SolarWind.Internals;
@@ -16,6 +17,7 @@ namespace Codestellation.SolarWind
     {
         private volatile Connection _connection;
         private readonly ChannelOptions _options;
+        private readonly TaskScheduler _ioScheduler;
 
         private volatile int _disposed;
         private const int Disposed = 1;
@@ -51,6 +53,10 @@ namespace Codestellation.SolarWind
                 throw new ArgumentNullException(nameof(factory));
             }
 
+            _ioScheduler = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? IOTaskScheduler.Instance
+                : TaskScheduler.Default;
+
             _batch = new Message[100];
             _logger = factory.CreateLogger<Channel>();
             _session = new Session(options.Serializer, OnIncomingMessage, factory.CreateLogger<Session>());
@@ -84,12 +90,12 @@ namespace Codestellation.SolarWind
 
             Task
                 .Factory
-                .StartNew(() => StartReadingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, IOTaskScheduler.Instance)
+                .StartNew(() => StartReadingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, _ioScheduler)
                 .ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
 
             Task
                 .Factory
-                .StartNew(() => StartWritingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, IOTaskScheduler.Instance)
+                .StartNew(() => StartWritingTask(cancellation.Token), cancellation.Token, TaskCreationOptions.None, _ioScheduler)
                 .ContinueWith(LogAndFail, TaskContinuationOptions.OnlyOnFaulted);
         }
 
