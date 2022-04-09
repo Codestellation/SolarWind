@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netcoreapp2.1;net472</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">netcoreapp2.1;net472</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Linux'))">netcoreapp2.1;net6</TargetFrameworks>
     <AssemblyName>Codestellation.SolarWind.Tests</AssemblyName>
     <RootNamespace>Codestellation.SolarWind.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
