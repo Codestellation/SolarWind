@@ -68,10 +68,7 @@ namespace Codestellation.SolarWind
                 return result;
             }
 
-            result = new Channel(options, _hubOptions.LoggerFactory)
-            {
-                RemoteUri = remoteUri
-            };
+            result = new Channel(options, _hubOptions.ChannelLogger, _hubOptions.SessionLogger) { RemoteUri = remoteUri };
             Channel added = _outChannels.GetOrAdd(remoteUri, result);
             //Another thread was lucky to add it first. So return his result
             if (added != result)
@@ -141,7 +138,11 @@ namespace Codestellation.SolarWind
         {
             var channelId = new ChannelId(_hubOptions.HubId, remoteHubId);
 
-            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(before(id.Remote), _hubOptions.LoggerFactory) {RemoteHubId = remoteHubId});
+            Channel channel = _channels.GetOrAdd(channelId, id => new Channel(
+                before(id.Remote),
+                _hubOptions.ChannelLogger,
+                _hubOptions.SessionLogger) { RemoteHubId = remoteHubId });
+
             channel.ChannelId = channelId;
             _remoteIndex.TryAdd(remoteHubId, channel);
             after(channelId, channel);

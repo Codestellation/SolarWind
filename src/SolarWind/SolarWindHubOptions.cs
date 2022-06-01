@@ -1,6 +1,7 @@
 using System;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
+using Codestellation.SolarWind.Internals;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -11,7 +12,6 @@ namespace Codestellation.SolarWind
         private TimeSpan _sendTimeout;
         private TimeSpan _receiveTimeout;
         private readonly CancellationTokenSource _cancellationSource;
-        public ILoggerFactory LoggerFactory { get; }
 
         public X509Certificate Certificate { get; set; }
 
@@ -45,14 +45,27 @@ namespace Codestellation.SolarWind
             }
 
             HubId = hubId;
-            LoggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
+            loggerFactory ??= NullLoggerFactory.Instance;
 
             NoDelay = true;
             SendTimeout = TimeSpan.FromSeconds(1);
             ReceiveTimeout = TimeSpan.FromSeconds(1);
 
             _cancellationSource = new CancellationTokenSource();
+
+            ConnectionLogger = loggerFactory.CreateLogger<Connection>();
+            ChannelLogger = loggerFactory.CreateLogger<Channel>();
+            ListenerWorkerLogger = loggerFactory.CreateLogger<ListenerWorker>();
+            SessionLogger = loggerFactory.CreateLogger<Session>();
         }
+
+        internal ILogger<Session> SessionLogger { get; set; }
+
+        internal ILogger<ListenerWorker> ListenerWorkerLogger { get; }
+
+        internal ILogger<Channel> ChannelLogger { get; }
+
+        internal ILogger<Connection> ConnectionLogger { get; }
 
         public SolarWindHubOptions(ILoggerFactory loggerFactory)
             : this(HubId.Generate(), loggerFactory)

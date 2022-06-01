@@ -22,10 +22,11 @@ namespace Codestellation.SolarWind
         /// </summary>
         public TimeSpan KeepAliveTimeout { get; set; }
 
+
         /// <summary>
-        /// Creates a new instance of <see cref="ChannelOptions"/> without callback set. All incoming messages will be dropped.
+        /// Creates a new instance of <see cref="ChannelOptions" /> without callback set. All incoming messages will be dropped.
         /// </summary>
-        /// <param name="serializer">Am instance of <see cref="ISerializer"/></param>
+        /// <param name="serializer">Am instance of <see cref="ISerializer" /></param>
         public ChannelOptions(ISerializer serializer) : this(serializer, EmptyCallback)
         {
         }

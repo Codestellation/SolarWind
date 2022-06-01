@@ -44,22 +44,19 @@ namespace Codestellation.SolarWind
 
         public event Action<Channel> OnKeepAliveTimeout;
 
-        public Channel(ChannelOptions options, ILoggerFactory factory)
+        internal Channel(ChannelOptions options, ILogger<Channel> channelLogger, ILogger<Session> sessionLogger)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
 
-            if (factory == null)
-            {
-                throw new ArgumentNullException(nameof(factory));
-            }
+            _logger = channelLogger ?? throw new ArgumentNullException(nameof(channelLogger));
 
             _ioScheduler = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? IOTaskScheduler.Instance
                 : TaskScheduler.Default;
 
             _batch = new Message[100];
-            _logger = factory.CreateLogger<Channel>();
-            _session = new Session(options.Serializer, OnIncomingMessage, factory.CreateLogger<Session>());
+
+            _session = new Session(options.Serializer, OnIncomingMessage, sessionLogger);
             OnKeepAliveTimeout += channel => { };
 
             _lastReceived = _lastSent = DateTime.Now.Ticks;

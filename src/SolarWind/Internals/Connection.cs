@@ -133,7 +133,7 @@ namespace Codestellation.SolarWind.Internals
 
         public static async Task Accept(SolarWindHubOptions options, Socket socket, Action<HubId, Connection> onAccepted)
         {
-            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+            ILogger<Connection> logger = options.ConnectionLogger;
 
             AsyncNetworkStream networkStream = null;
             try
@@ -149,7 +149,7 @@ namespace Codestellation.SolarWind.Internals
 
                 logger.LogInformation("End handshake as server");
 
-                var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>(), null, options.Cancellation);
+                var connection = new Connection(networkStream, logger, null, options.Cancellation);
                 onAccepted(incoming.HubId, connection);
             }
             catch (Exception ex)
@@ -172,7 +172,7 @@ namespace Codestellation.SolarWind.Internals
             }
 
             Action reconnect = () => ConnectTo(options, remoteUri, onConnected);
-            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+            ILogger<Connection> logger = options.ConnectionLogger;
 
             var connection = new Connection(stream, logger, reconnect, options.Cancellation);
             onConnected(remoteUri, handshake.HubId, connection);
@@ -184,7 +184,7 @@ namespace Codestellation.SolarWind.Internals
             {
                 try
                 {
-                    ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+                    ILogger<Connection> logger = options.ConnectionLogger;
                     while (!options.Cancellation.IsCancellationRequested)
                     {
                         IPEndPoint[] remoteEp = remoteUri.ResolveRemoteEndpoint();

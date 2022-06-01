@@ -10,7 +10,7 @@ namespace Codestellation.SolarWind.Internals
     {
         private readonly IPEndPoint _endpoint;
         private readonly SolarWindHubOptions _options;
-        private readonly ILogger _logger;
+        private readonly ILogger<ListenerWorker> _logger;
         private readonly Action<HubId, Connection> _onAccepted;
         private Socket _listener;
         private SocketAsyncEventArgs _args;
@@ -22,7 +22,7 @@ namespace Codestellation.SolarWind.Internals
             _endpoint = endpoint;
             _options = options;
             _onAccepted = onAccepted;
-            _logger = options.LoggerFactory.CreateLogger<ListenerWorker>();
+            _logger = options.ListenerWorkerLogger;
         }
 
         public void Start()
