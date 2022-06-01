@@ -10,6 +10,7 @@ namespace Codestellation.SolarWind
     {
         private TimeSpan _sendTimeout;
         private TimeSpan _receiveTimeout;
+        private readonly CancellationTokenSource _cancellationSource;
         public ILoggerFactory LoggerFactory { get; }
 
         public X509Certificate Certificate { get; set; }
@@ -27,6 +28,8 @@ namespace Codestellation.SolarWind
             get => _receiveTimeout;
             set => _receiveTimeout = ValidateTimeout(value);
         }
+
+        internal CancellationToken Cancellation => _cancellationSource.Token;
 
 
         /// <summary>
@@ -47,6 +50,8 @@ namespace Codestellation.SolarWind
             NoDelay = true;
             SendTimeout = TimeSpan.FromSeconds(1);
             ReceiveTimeout = TimeSpan.FromSeconds(1);
+
+            _cancellationSource = new CancellationTokenSource();
         }
 
         public SolarWindHubOptions(ILoggerFactory loggerFactory)
@@ -66,5 +71,7 @@ namespace Codestellation.SolarWind
 
             return value;
         }
+
+        public void RaiseCancellation() => _cancellationSource.Cancel();
     }
 }

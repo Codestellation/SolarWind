@@ -9,6 +9,16 @@ max_line_length = 180
 insert_final_newline = false
 trim_trailing_whitespace = true
 
+[*.{js,json,jsx,jade,rb,sh,xml,config,html,css,csproj,props,targets}]
+indent_style = space
+indent_size = 2
+
+[*.csproj]
+# Look here for clarification https://www.jetbrains.com/help/resharper/EditorConfig_XML_XmlCodeStylePageSchema.html
+xml_space_before_self_closing = true
+# The next is made for Rider as it doesn't support resharper properties https://youtrack.jetbrains.com/issue/RIDER-25867
+xml_space_inside_empty_tag = true
+
 [*.cs]
 indent_style = space
 indent_size = 4
@@ -84,6 +94,52 @@ dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
 
 xmldoc_indent_text = remove_indent
 
-[*.{js,json,jsx,jade,rb,sh,xml,config,html,css}]
-indent_style = space
-indent_size = 2
+###############################
+# Built in  Inspections       #
+###############################
+# see  https://docs.microsoft.com/en-us/dotnet/fundamentals/code-analysis/categories for details
+dotnet_analyzer_diagnostic.category-Usage.severity = warning
+dotnet_analyzer_diagnostic.category-Performance.severity = error
+dotnet_analyzer_diagnostic.category-Reliability.severity = error
+
+# Lowered severity for low impact inspections
+# CA1822: Mark members as static
+dotnet_diagnostic.CA1822.severity = suggestion
+# CA2211: Non-constant fields should not be visible
+dotnet_diagnostic.CA2211.severity = suggestion
+# CA1848: Logging performance optimization suggestion
+dotnet_diagnostic.CA1848.severity = suggestion
+
+###############################
+# Reliability Inspections     #
+###############################
+
+# VSTHRD002 Avoid problematic synchronous waits
+dotnet_diagnostic.VSTHRD002.severity = error
+
+# VSTHRD011 Use AsyncLazy<T>
+dotnet_diagnostic.VSTHRD011.severity = error
+
+# VSTHRD100 Avoid async void methods
+dotnet_diagnostic.VSTHRD100.severity = error
+
+# VSTHRD101 Avoid unsupported async delegates
+dotnet_diagnostic.VSTHRD101.severity = error
+
+# VSTHRD102 Implement internal logic asynchronously
+dotnet_diagnostic.VSTHRD102.severity = error
+
+# VSTHRD103 Call async methods when in an async method
+dotnet_diagnostic.VSTHRD103.severity = error
+
+# VSTHRD110 Observe result of async calls
+dotnet_diagnostic.VSTHRD110.severity = error
+
+# VSTHRD111 Use .ConfigureAwait(bool)
+dotnet_diagnostic.VSTHRD111.severity = error
+
+# VSTHRD112 Implement System.IAsyncDisposable
+dotnet_diagnostic.VSTHRD112.severity = error
+
+# VSTHRD200 Use Async suffix for async methods
+dotnet_diagnostic.VSTHRD200.severity = none

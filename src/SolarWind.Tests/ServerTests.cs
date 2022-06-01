@@ -185,8 +185,8 @@ namespace Codestellation.SolarWind.Tests
             }
 
             client.Connect(_uri.Host, _uri.Port);
-            client.Stream.SendHandshake(_clientHubId);
-            HandshakeMessage _ = client.Stream.ReceiveHandshake().Result;
+            client.Stream.SendHandshake(_clientHubId, CancellationToken.None);
+            HandshakeMessage _ = client.Stream.ReceiveHandshake(CancellationToken.None).Result;
             return client;
         }
     }

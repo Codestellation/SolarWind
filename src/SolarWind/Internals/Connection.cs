@@ -16,6 +16,7 @@ namespace Codestellation.SolarWind.Internals
         private readonly AsyncNetworkStream _networkStream;
         private readonly ILogger _logger;
         private readonly Action _reconnect;
+        private readonly CancellationToken _cancellation;
         private bool _disposed;
         private readonly byte[] _readBuffer;
         private int _readPosition;
@@ -26,16 +27,25 @@ namespace Codestellation.SolarWind.Internals
 
         public bool Connected => !_disposed;
 
-        private Connection(AsyncNetworkStream networkStream, ILogger logger, Action reconnect)
+        private Connection(AsyncNetworkStream networkStream, ILogger logger, Action reconnect, CancellationToken cancellation)
         {
             _networkStream = networkStream ?? throw new ArgumentNullException(nameof(networkStream));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _reconnect = reconnect;
+            _cancellation = cancellation;
             _readBuffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
             _writeBuffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
         }
 
-        public void Reconnect() => _reconnect?.Invoke();
+        public void Reconnect()
+        {
+            if (_cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _reconnect?.Invoke();
+        }
 
 
         public async ValueTask ReceiveAsync(PooledMemoryStream destination, int bytesToReceive, CancellationToken cancellation)
@@ -134,12 +144,12 @@ namespace Codestellation.SolarWind.Internals
                 logger.LogInformation("Begin handshake as server");
 
                 HandshakeMessage incoming = await networkStream
-                    .HandshakeAsServer(options.HubId, logger)
+                    .HandshakeAsServer(options.HubId, logger, options.Cancellation)
                     .ConfigureAwait(false);
 
                 logger.LogInformation("End handshake as server");
 
-                var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>(), null);
+                var connection = new Connection(networkStream, options.LoggerFactory.CreateLogger<Connection>(), null, options.Cancellation);
                 onAccepted(incoming.HubId, connection);
             }
             catch (Exception ex)
@@ -149,39 +159,54 @@ namespace Codestellation.SolarWind.Internals
             }
         }
 
-        public static async void ConnectTo(SolarWindHubOptions options, Uri remoteUri, Action<Uri, HubId, Connection> onConnected)
+        public static async void ConnectTo(
+            SolarWindHubOptions options,
+            Uri remoteUri,
+            Action<Uri, HubId, Connection> onConnected)
         {
             (HandshakeMessage handshake, AsyncNetworkStream stream) = await DoConnect(options, remoteUri).ConfigureAwait(false);
+
+            if (options.Cancellation.IsCancellationRequested)
+            {
+                return;
+            }
 
             Action reconnect = () => ConnectTo(options, remoteUri, onConnected);
             ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
 
-
-            var connection = new Connection(stream, logger, reconnect);
+            var connection = new Connection(stream, logger, reconnect, options.Cancellation);
             onConnected(remoteUri, handshake.HubId, connection);
         }
 
         private static async Task<(HandshakeMessage handshake, AsyncNetworkStream stream)> DoConnect(SolarWindHubOptions options, Uri remoteUri)
         {
-            ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
-
-            while (true)
+            try
             {
-                IPEndPoint[] remoteEp = remoteUri.ResolveRemoteEndpoint();
-                foreach (IPEndPoint ipEndPoint in remoteEp)
+                ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+                while (!options.Cancellation.IsCancellationRequested)
                 {
-                    (HandshakeMessage handshake, AsyncNetworkStream stream) =
-                        await TryConnectoTo(remoteUri, ipEndPoint, logger, options)
-                            .ConfigureAwait(false);
-
-                    if (handshake != null)
+                    IPEndPoint[] remoteEp = remoteUri.ResolveRemoteEndpoint();
+                    foreach (IPEndPoint ipEndPoint in remoteEp)
                     {
-                        return (handshake, stream);
+                        (HandshakeMessage handshake, AsyncNetworkStream stream) =
+                            await TryConnectoTo(remoteUri, ipEndPoint, logger, options)
+                                .ConfigureAwait(false);
+
+                        if (handshake != null)
+                        {
+                            return (handshake, stream);
+                        }
                     }
+
+                    await Task.Delay(5000, options.Cancellation).ConfigureAwait(false);
                 }
 
-                await Task.Delay(5000).ConfigureAwait(false);
             }
+            catch (TaskCanceledException)
+            {
+            }
+
+            return (null, null);
         }
 
         private static async Task<(HandshakeMessage handshakeResponse, AsyncNetworkStream networkStream)> TryConnectoTo(
@@ -204,7 +229,7 @@ namespace Codestellation.SolarWind.Internals
                 var networkStream = new AsyncNetworkStream(socket);
 
                 HandshakeMessage handshakeResponse = await networkStream
-                    .HandshakeAsClient(options.HubId, logger)
+                    .HandshakeAsClient(options.HubId, logger, options.Cancellation)
                     .ConfigureAwait(false);
 
                 logger.LogInformation($"Successfully connected to '{handshakeResponse.HubId}' ({remoteUri})");

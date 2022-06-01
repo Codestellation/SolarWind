@@ -9,10 +9,18 @@ namespace Codestellation.SolarWind.Tests
 
         public class ConsoleLoggerFactory : ILoggerFactory
         {
-            public void Dispose() => throw new NotImplementedException();
+            private bool _disposed;
+            public void Dispose() => _disposed = true;
 
             public ILogger CreateLogger(string categoryName)
-                => ConsoleLogger.Instance;
+            {
+                if (_disposed)
+                {
+                    throw new ObjectDisposedException(nameof(ConsoleLoggerFactory));
+                }
+
+                return ConsoleLogger.Instance;
+            }
 
             public void AddProvider(ILoggerProvider provider) => throw new NotImplementedException();
         }

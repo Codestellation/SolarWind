@@ -23,7 +23,7 @@ namespace Codestellation.SolarWind.Internals
             WireHeader.WriteTo(in wireHeader, buffer, 0);
         }
 
-        public static ValueTask SendHandshake(this AsyncNetworkStream networkStream, HubId hubId)
+        public static ValueTask SendHandshake(this AsyncNetworkStream networkStream, HubId hubId, CancellationToken cancellation)
         {
             //TODO: Use buffer pool one day
             var buffer = new byte[1024];
@@ -33,13 +33,14 @@ namespace Codestellation.SolarWind.Internals
             var outgoingHeader = new WireHeader(msgHeader, new PayloadSize(payloadSize));
             WireHeader.WriteTo(in outgoingHeader, buffer, 0);
             var memory = new ReadOnlyMemory<byte>(buffer, 0, WireHeader.Size + payloadSize);
-            return networkStream.WriteAsync(memory, CancellationToken.None);
+            return networkStream.WriteAsync(memory, cancellation);
         }
 
-        public static async ValueTask<HandshakeMessage> ReceiveHandshake(this AsyncNetworkStream self)
+
+        public static async ValueTask<HandshakeMessage> ReceiveHandshake(this AsyncNetworkStream self, CancellationToken cancellation)
         {
-            Task<HandshakeMessage> handshake = HandshakeMessage(self);
-            Task timeout = Task.Delay(2000);
+            Task<HandshakeMessage> handshake = HandshakeMessage(self, cancellation);
+            Task timeout = Task.Delay(2000, cancellation);
             await Task.WhenAny(handshake, timeout).ConfigureAwait(false);
 
             if (handshake.IsCompleted)
@@ -54,12 +55,12 @@ namespace Codestellation.SolarWind.Internals
         }
 
 
-        private static async Task<HandshakeMessage> HandshakeMessage(this AsyncNetworkStream self)
+        private static async Task<HandshakeMessage> HandshakeMessage(this AsyncNetworkStream self, CancellationToken cancellation)
         {
             PooledMemoryStream buffer = MemoryStreamPool.Instance.Get();
             try
             {
-                await ReceiveBytesAsync(self, buffer, WireHeader.Size).ConfigureAwait(ContinueOn.IOScheduler);
+                await ReceiveBytesAsync(self, buffer, WireHeader.Size, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
 
 
                 buffer.Position = 0;
@@ -72,7 +73,7 @@ namespace Codestellation.SolarWind.Internals
                     throw new SolarWindException("Invalid wire header");
                 }
 
-                await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value).ConfigureAwait(ContinueOn.IOScheduler);
+                await ReceiveBytesAsync(self, buffer, wireHeader.PayloadSize.Value, cancellation).ConfigureAwait(ContinueOn.IOScheduler);
                 buffer.Position = 0;
                 return Protocol.HandshakeMessage.ReadFrom(buffer, wireHeader.PayloadSize.Value);
             }
@@ -83,13 +84,17 @@ namespace Codestellation.SolarWind.Internals
         }
 
 
-        private static async ValueTask ReceiveBytesAsync(this AsyncNetworkStream self, PooledMemoryStream readBuffer, int bytesToReceive)
+        private static async ValueTask ReceiveBytesAsync(
+            this AsyncNetworkStream self,
+            PooledMemoryStream readBuffer,
+            int bytesToReceive,
+            CancellationToken cancellation)
         {
             var left = bytesToReceive;
             do
             {
                 left -= await readBuffer
-                    .WriteAsync(self, left, CancellationToken.None)
+                    .WriteAsync(self, left, cancellation)
                     .ConfigureAwait(ContinueOn.IOScheduler);
             } while (left != 0);
         }

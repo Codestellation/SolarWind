@@ -31,9 +31,9 @@ namespace Codestellation.SolarWind.Tests
             _client = _listener.Accept();
             _client.ReceiveTimeout = Timeout.Infinite;
             var server = new AsyncNetworkStream(_client);
-            HandshakeMessage handshake = server.ReceiveHandshake().Result;
+            HandshakeMessage handshake = server.ReceiveHandshake(CancellationToken.None).Result;
             Console.WriteLine(handshake.HubId);
-            server.SendHandshake(HubId.Generate());
+            server.SendHandshake(HubId.Generate(), CancellationToken.None);
 
             using (var buffer = new PooledMemoryStream())
             {

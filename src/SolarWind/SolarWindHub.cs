@@ -12,7 +12,6 @@ namespace Codestellation.SolarWind
     {
         private readonly SolarWindHubOptions _hubOptions;
         private readonly ConcurrentDictionary<ChannelId, Channel> _channels;
-        private bool _disposed;
         private readonly Listener _listener;
         private readonly ConcurrentDictionary<Uri, Channel> _outChannels;
         private readonly ConcurrentDictionary<HubId, Channel> _remoteIndex;
@@ -100,12 +99,12 @@ namespace Codestellation.SolarWind
         /// <inheritdoc />
         public void Dispose()
         {
-            if (_disposed)
+            if (_hubOptions.Cancellation.IsCancellationRequested)
             {
                 return;
             }
 
-            _disposed = true;
+            _hubOptions.RaiseCancellation();
 
             _listener.Dispose();
             Parallel.ForEach(_channels, c => c.Value.Dispose());
@@ -152,7 +151,7 @@ namespace Codestellation.SolarWind
 
         private void EnsureNotDisposed()
         {
-            if (_disposed)
+            if (_hubOptions.Cancellation.IsCancellationRequested)
             {
                 throw new ObjectDisposedException(nameof(SolarWindHub));
             }
