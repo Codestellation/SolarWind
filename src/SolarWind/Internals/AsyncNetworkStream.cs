@@ -17,6 +17,7 @@ namespace Codestellation.SolarWind.Internals
         {
         }
 
+
 #if NETSTANDARD2_0
         //protected override void Dispose(bool disposing) => Socket.SafeDispose();
 
@@ -183,7 +184,21 @@ namespace Codestellation.SolarWind.Internals
                 args.SetResult();
             }
         }
+#else
+        public override async ValueTask<int> ReadAsync(Memory<byte> to, CancellationToken cancellation)
+        {
+            int result = await base.ReadAsync(to, cancellation).ConfigureAwait(false);
+            if (result == 0)
+            {
+                ThrowConnectionClosedException();
+            }
+
+            return result;
+        }
 #endif
+
+        private static IOException ThrowConnectionClosedException() => throw BuildConnectionClosedException();
+
         private static IOException BuildConnectionClosedException() => BuildIoException(SocketError.SocketError, "The counterpart has closed the connection");
 
         private static IOException BuildIoException(SocketError socketError, string message = "Send or receive failed")
