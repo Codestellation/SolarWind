@@ -180,30 +180,32 @@ namespace Codestellation.SolarWind.Internals
 
         private static async Task<(HandshakeMessage handshake, AsyncNetworkStream stream)> DoConnect(SolarWindHubOptions options, Uri remoteUri)
         {
-            try
+            if (!options.Cancellation.IsCancellationRequested)
             {
-                ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
-                while (!options.Cancellation.IsCancellationRequested)
+                try
                 {
-                    IPEndPoint[] remoteEp = remoteUri.ResolveRemoteEndpoint();
-                    foreach (IPEndPoint ipEndPoint in remoteEp)
+                    ILogger<Connection> logger = options.LoggerFactory.CreateLogger<Connection>();
+                    while (!options.Cancellation.IsCancellationRequested)
                     {
-                        (HandshakeMessage handshake, AsyncNetworkStream stream) =
-                            await TryConnectoTo(remoteUri, ipEndPoint, logger, options)
-                                .ConfigureAwait(false);
-
-                        if (handshake != null)
+                        IPEndPoint[] remoteEp = remoteUri.ResolveRemoteEndpoint();
+                        foreach (IPEndPoint ipEndPoint in remoteEp)
                         {
-                            return (handshake, stream);
+                            (HandshakeMessage handshake, AsyncNetworkStream stream) =
+                                await TryConnectoTo(remoteUri, ipEndPoint, logger, options)
+                                    .ConfigureAwait(false);
+
+                            if (handshake != null)
+                            {
+                                return (handshake, stream);
+                            }
                         }
+
+                        await Task.Delay(5000, options.Cancellation).ConfigureAwait(false);
                     }
-
-                    await Task.Delay(5000, options.Cancellation).ConfigureAwait(false);
                 }
-
-            }
-            catch (TaskCanceledException)
-            {
+                catch (TaskCanceledException)
+                {
+                }
             }
 
             return (null, null);
