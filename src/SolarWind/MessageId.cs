@@ -46,6 +46,11 @@ namespace Codestellation.SolarWind
         /// <inheritdoc />
         public override string ToString() => _value.ToString(CultureInfo.InvariantCulture);
 
-        public static MessageId Initialize() => new MessageId((ulong)Environment.TickCount);
+        public static MessageId Initialize()
+        {
+            ulong ticks = (ulong)Environment.TickCount;
+            ulong id = ticks << 24;
+            return new MessageId(id);
+        }
     }
 }
