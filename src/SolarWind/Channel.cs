@@ -150,13 +150,14 @@ namespace Codestellation.SolarWind
                 WireHeader wireHeader = WireHeader.ReadFrom(buffer);
                 buffer.Reset();
 
-                await _connection.ReceiveAsync(buffer, wireHeader.PayloadSize.Value, token).ConfigureAwait(ContinueOn.IOScheduler);
+                int payloadSize = wireHeader.PayloadSize.Value;
+                await _connection.ReceiveAsync(buffer, payloadSize, token).ConfigureAwait(ContinueOn.IOScheduler);
                 buffer.Position = 0;
                 var message = new Message(wireHeader.MessageHeader, buffer);
 
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug($"Received {message.Header.ToString()}");
+                    _logger.LogDebug($"Received {message.Header.ToString()} size={payloadSize}");
                 }
                 _session.EnqueueIncoming(message);
                 _lastReceived = DateTime.Now.Ticks;
