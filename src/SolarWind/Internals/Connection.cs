@@ -88,14 +88,17 @@ namespace Codestellation.SolarWind.Internals
         {
             try
             {
+                PooledMemoryStream payload = message.Payload;
+                long payloadLength = payload.Length;
+
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug($"Writing message {message.Header.ToString()}");
+                    _logger.LogDebug($"Writing message {message.Header.ToString()} size={payloadLength}");
                 }
 
                 var available = _writeBuffer.Length - _writePosition;
-                PooledMemoryStream payload = message.Payload;
-                var wireHeader = new WireHeader(message.Header, new PayloadSize((int)payload.Length));
+                var payloadSize = new PayloadSize((int)payloadLength);
+                var wireHeader = new WireHeader(message.Header, payloadSize);
 
                 if (available < WireHeader.Size)
                 {
@@ -105,7 +108,7 @@ namespace Codestellation.SolarWind.Internals
                 WireHeader.WriteTo(in wireHeader, _writeBuffer, _writePosition);
                 _writePosition += WireHeader.Size;
 
-                var bytesToSend = (int)payload.Length;
+                var bytesToSend = (int)payloadLength;
                 payload.Position = 0;
                 while (bytesToSend > 0)
                 {
