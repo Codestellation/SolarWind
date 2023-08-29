@@ -120,17 +120,21 @@ namespace Codestellation.SolarWind.Internals
                 for (var i = 0; i < batchLength; i++)
                 {
                     Message incoming = batch[i];
+                    PooledMemoryStream payload = incoming.Payload;
+                    long position = payload.Position;
+                    long length = payload.Length;
+
                     object data;
                     try
                     {
-                        data = _serializer.Deserialize(incoming.Header, incoming.Payload);
+                        data = _serializer.Deserialize(incoming.Header, payload);
                         incoming.Dispose();
                     }
                     catch (Exception ex)
                     {
                         if (_logger.IsEnabled(LogLevel.Error))
                         {
-                            _logger.LogError(ex, $"Deserialization failure. {incoming.Header.ToString()}");
+                            _logger.LogError(ex, $"Deserialization failure: position={position} length={length} offset={payload.Position} header={incoming.Header.ToString()}");
                         }
 
                         incoming.Dispose();
