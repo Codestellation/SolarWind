@@ -82,7 +82,21 @@ csharp_style_prefer_index_operator = true:warning
 csharp_style_prefer_range_operator = true:warning
 csharp_style_deconstructed_variable_declaration = true:warning
 csharp_style_prefer_switch_expression = true:warning
+# https://www.jetbrains.com/help/resharper/EditorConfig_CSHARP_BlankLinesPageScheme.html#Blank_lines_in_declarations
+csharp_blank_lines_around_local_method = 1
+csharp_blank_lines_around_single_line_local_method = 1
+csharp_blank_lines_around_type = 1
+csharp_remove_blank_lines_near_braces_in_declarations = true
+csharp_blank_lines_around_single_line_type = 1
+csharp_blank_lines_inside_type = 0
+csharp_blank_lines_around_invocable = 1
+csharp_keep_blank_lines_in_code = 1
+csharp_remove_blank_lines_near_braces_in_code = true
 
+csharp_local_function_body = expression_body
+
+parentheses_non_obvious_operations = conditional_and, bitwise, bitwise_inclusive_or, bitwise_exclusive_or, shift, bitwise_and
+parentheses_redundancy_style = remove
 
 resharper_space_within_single_line_array_initializer_braces = true
 
@@ -109,6 +123,8 @@ dotnet_diagnostic.CA1822.severity = suggestion
 dotnet_diagnostic.CA2211.severity = suggestion
 # CA1848: Logging performance optimization suggestion
 dotnet_diagnostic.CA1848.severity = suggestion
+# CA1852: Seal internal types
+dotnet_diagnostic.CA1852.severity = suggestion
 
 ###############################
 # Reliability Inspections     #
